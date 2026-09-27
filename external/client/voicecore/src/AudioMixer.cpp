@@ -6,6 +6,7 @@
 #include "voicecore/OpusCodec.h"
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <deque>
 
@@ -17,6 +18,13 @@ namespace voicecore
         constexpr size_t MAX_QUEUE_PACKETS    = 12;  // danach aufholen / catch up beyond this
         constexpr int    MAX_PLC_FRAMES       = 4;   // ~80 ms Verlust kaschieren / conceal
         constexpr int    SAMPLES_PER_FRAMENO  = 480; // Mumble zaehlt 10-ms-Frames / counts 10 ms frames
+        constexpr uint64_t IDLE_REMOVE_MS     = 30000;  // stille Sprecher entfernen / remove silent speakers
+
+        uint64_t NowMs()
+        {
+            return uint64_t(std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+        }
     }
 
     struct AudioMixer::Speaker
@@ -32,6 +40,7 @@ namespace voicecore
         bool hasGain = false;
         float lastLeft = 0.0f, lastRight = 0.0f;
         float lpState = 0.0f;
+        uint64_t lastPush = 0;
     };
 
     AudioMixer::AudioMixer() = default;
@@ -40,12 +49,27 @@ namespace voicecore
     void AudioMixer::Push(uint32_t session, uint64_t frameNumber, const std::vector<uint8_t>& opus, bool terminator)
     {
         std::lock_guard<std::mutex> g(_mutex);
+        uint64_t now = NowMs();
+        // DE: Lange stille Sprecher entfernen (Decoder-Speicher, Mix-Aufwand). EN: remove long-silent speakers (decoder memory, mix cost).
+        if (now - _lastPrune > 5000)
+        {
+            _lastPrune = now;
+            for (auto it = _speakers.begin(); it != _speakers.end();)
+            {
+                const Speaker& s = *it->second;
+                if (it->first != session && !s.started && s.queue.empty() && s.pcm.empty() && now - s.lastPush > IDLE_REMOVE_MS)
+                    it = _speakers.erase(it);
+                else
+                    ++it;
+            }
+        }
         auto& sp = _speakers[session];
         if (!sp)
         {
             sp = std::make_unique<Speaker>();
             if (!sp->dec.Init()) { _speakers.erase(session); return; }
         }
+        sp->lastPush = now;
         if (sp->started && frameNumber < sp->nextFrame)
             return;   // zu spaet / too late
         sp->queue[frameNumber] = { opus, terminator };

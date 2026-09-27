@@ -47,5 +47,6 @@ namespace voicecore
         mutable std::mutex _mutex;
         std::map<uint32_t, std::unique_ptr<Speaker>> _speakers;
         float _master = 1.0f;
+        uint64_t _lastPrune = 0;
     };
 }

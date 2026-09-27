@@ -42,7 +42,9 @@ namespace voicecore
     int OpusDec::Decode(const uint8_t* data, size_t len, float* pcm, int maxSamples)
     {
         if (!_dec) return -1;
-        if (!data) return opus_decode_float(_dec, nullptr, 0, pcm, FRAME_SAMPLES < maxSamples ? FRAME_SAMPLES : maxSamples, 0);
+        // DE: Verlust oder leeres Paket (z. B. Terminator) -> ein 20-ms-Frame PLC, nicht maxSamples.
+        // EN: loss or empty packet (e.g. terminator) -> one 20 ms PLC frame, not maxSamples.
+        if (!data || len == 0) return opus_decode_float(_dec, nullptr, 0, pcm, FRAME_SAMPLES < maxSamples ? FRAME_SAMPLES : maxSamples, 0);
         return opus_decode_float(_dec, data, opus_int32(len), pcm, maxSamples, 0);
     }
 

@@ -54,7 +54,7 @@ namespace VoiceChat
         asio::steady_timer pingTimer{ io }, reconnectTimer{ io }, maintTimer{ io };
         unsigned reconnectDelay = 5;   // Sekunden / seconds
 
-        std::deque<std::vector<uint8_t>> writeQueue;
+        std::deque<std::shared_ptr<std::vector<uint8_t>>> writeQueue;
         bool writing = false;
         uint8_t header[TCP_HEADER_SIZE] = {};
         std::vector<uint8_t> body;
@@ -73,8 +73,12 @@ namespace VoiceChat
         double tokens = 0;
         uint64_t lastRefill = 0;
         asio::steady_timer limitTimer{ io }, pendingTimer{ io };
-        std::map<uint32_t, std::vector<std::string>> pendingMoves;
+        // DE: Offene Verschiebungen bleiben, bis Murmur sie bestaetigt (Wiederholung alle 3 s, max. 10x).
+        // EN: open moves stay until Murmur confirms them (retry every 3 s, max 10x).
+        struct PendingMove { std::vector<std::string> path; uint64_t lastSent = 0; int tries = 0; };
+        std::map<uint32_t, PendingMove> pendingMoves;
         bool rootAcl = false, lobbyAcl = false;
+        uint64_t selfMoveAt = 0;
 
         std::mutex evMutex;
         std::vector<Event> events;
@@ -153,6 +157,8 @@ namespace VoiceChat
             creating.clear();
             limited.clear();
             rootAcl = lobbyAcl = false;
+            selfMoveAt = 0;
+            for (auto& m : pendingMoves) { m.second.lastSent = 0; m.second.tries = 0; }
             pingTimer.cancel();
             maintTimer.cancel();
             limitTimer.cancel();
@@ -169,7 +175,7 @@ namespace VoiceChat
 
         void Send(Tcp type, const std::vector<uint8_t>& payload)
         {
-            writeQueue.push_back(Frame(type, payload));
+            writeQueue.push_back(std::make_shared<std::vector<uint8_t>>(Frame(type, payload)));
             if (!writing) DoWrite(generation);
         }
 
@@ -213,7 +219,9 @@ namespace VoiceChat
         {
             if (writeQueue.empty() || !stream) { writing = false; return; }
             writing = true;
-            asio::async_write(*stream, asio::buffer(writeQueue.front()), [this, gen](const boost::system::error_code& ec, size_t) {
+            // DE: Puffer lebt im Handler weiter, auch wenn Fail() die Queue leert. EN: buffer lives on in the handler even if Fail() clears the queue.
+            auto buf = writeQueue.front();
+            asio::async_write(*stream, asio::buffer(*buf), [this, gen, buf](const boost::system::error_code& ec, size_t) {
                 if (gen != generation) return;
                 if (ec) return Fail("write: " + ec.message());
                 writeQueue.pop_front();
@@ -229,7 +237,12 @@ namespace VoiceChat
                 uint32_t len = (uint32_t(header[2]) << 24) | (uint32_t(header[3]) << 16) | (uint32_t(header[4]) << 8) | header[5];
                 if (len > MAX_TCP_PAYLOAD) return Fail("oversized message");
                 body.resize(len);
-                if (len == 0) { Handle(uint16_t((header[0] << 8) | header[1])); return ReadHeader(gen); }
+                if (len == 0)
+                {
+                    Handle(uint16_t((header[0] << 8) | header[1]));
+                    if (gen == generation) ReadHeader(gen);
+                    return;
+                }
                 asio::async_read(*stream, asio::buffer(body), [this, gen](const boost::system::error_code& ec2, size_t) {
                     if (gen != generation) return;
                     if (ec2) return Fail("read: " + ec2.message());
@@ -424,8 +437,9 @@ namespace VoiceChat
             if (!lobby) { RequestCreate(*root, cfg.lobbyChannel); return; }
             if (!lobbyAcl) { SendAcl(*lobby, true); lobbyAcl = true; }
             auto self = users.find(ownSession);
-            if (self != users.end() && self->second.second != *lobby)
+            if (self != users.end() && self->second.second != *lobby && NowMs() - selfMoveAt > 5000)
             {
+                selfMoveAt = NowMs();
                 MumbleProto::UserState us;
                 us.session = ownSession.load();
                 us.channelId = *lobby;
@@ -439,29 +453,39 @@ namespace VoiceChat
         {
             auto root = FindChild(0, cfg.rootChannel);
             if (!root) return;
+            uint64_t now = NowMs();
             for (auto it = pendingMoves.begin(); it != pendingMoves.end();)
             {
                 auto user = users.find(it->first);
                 if (user == users.end()) { it = pendingMoves.erase(it); continue; }
                 uint32_t cur = *root;
                 bool complete = true;
-                for (const auto& seg : it->second)
+                for (const auto& seg : it->second.path)
                 {
                     auto child = FindChild(cur, seg);
                     if (!child) { RequestCreate(cur, seg); complete = false; break; }
                     cur = *child;
                 }
                 if (!complete) { ++it; continue; }
-                if (user->second.second != cur)
+                emptySince.erase(cur);
+                if (user->second.second == cur) { it = pendingMoves.erase(it); continue; }   // bestaetigt / confirmed
+                if (it->second.tries >= 10)
+                {
+                    Log("bot: giving up moving session " + std::to_string(it->first));
+                    it = pendingMoves.erase(it);
+                    continue;
+                }
+                if (now - it->second.lastSent >= 3000)
                 {
                     Verbose("move session " + std::to_string(it->first) + " -> channel " + std::to_string(cur));
                     MumbleProto::UserState us;
                     us.session = it->first;
                     us.channelId = cur;
                     Send(Tcp::UserState, us.Encode());
+                    it->second.lastSent = now;
+                    ++it->second.tries;
                 }
-                emptySince.erase(cur);
-                it = pendingMoves.erase(it);
+                ++it;
             }
         }
 
@@ -543,7 +567,10 @@ namespace VoiceChat
     void MumbleBot::MoveUser(uint32_t session, const std::vector<std::string>& path)
     {
         Impl* d = _impl.get();
-        asio::post(d->io, [d, session, path]() { d->pendingMoves[session] = path; if (d->synced) d->ProcessPending(); });
+        asio::post(d->io, [d, session, path]() {
+            d->pendingMoves[session] = Impl::PendingMove{ path, 0, 0 };
+            if (d->synced) d->ProcessPending();
+        });
     }
 
     void MumbleBot::Kick(uint32_t session, const std::string& reason)

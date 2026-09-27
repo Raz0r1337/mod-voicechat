@@ -155,7 +155,7 @@ namespace voicecore
 
         std::string err;
         Log("connecting to " + cfg.host + ":" + std::to_string(cfg.port));
-        if (!net.tls.Connect(cfg.host, cfg.port, cfg.certPinSha256, err))
+        if (!net.tls.Connect(cfg.host, cfg.port, cfg.certPinSha256, err, &_stop))
         {
             _net = nullptr;
             _state = ClientState::Disconnected;

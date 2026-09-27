@@ -106,6 +106,19 @@ namespace voice
         if (!g_logEnabled) return;
         std::lock_guard<std::mutex> g(g_logMutex);
         static std::string path = Config::ModuleDir() + "\\voice.log";
+        static bool rotated = false;
+        if (!rotated)
+        {
+            // DE: Groesser als 1 MB -> nach voice.old.log verschieben. EN: larger than 1 MB -> move to voice.old.log.
+            rotated = true;
+            WIN32_FILE_ATTRIBUTE_DATA fa;
+            if (GetFileAttributesExA(path.c_str(), GetFileExInfoStandard, &fa) && (fa.nFileSizeHigh || fa.nFileSizeLow > 1024 * 1024))
+            {
+                std::string old = Config::ModuleDir() + "\\voice.old.log";
+                DeleteFileA(old.c_str());
+                MoveFileA(path.c_str(), old.c_str());
+            }
+        }
         FILE* f = std::fopen(path.c_str(), "a");
         if (!f) return;
         std::time_t t = std::time(nullptr);

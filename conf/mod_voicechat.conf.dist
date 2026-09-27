@@ -155,6 +155,15 @@ Voice.ServerCulling = 1
 
 Voice.NearbyIntervalMs = 1000
 
+#    Voice.GroupAlwaysAudible
+#        DE: 1 = Gruppen-/Raidmitglieder sind immer voll hoerbar (auch auf anderen Maps/in Instanzen);
+#            ihre Position bestimmt nur die Richtung, nie die Lautstaerke. Fremde nur in Hoerweite.
+#        EN: 1 = party/raid members are always fully audible (also on other maps/in instances);
+#            their position only sets the direction, never the volume. Strangers only within range.
+#        Default: 1
+
+Voice.GroupAlwaysAudible = 1
+
 ###################################################################################################
 # RECHTE + SICHERHEIT / PERMISSIONS + SECURITY
 #
@@ -192,12 +201,3 @@ Voice.NonceTtlSeconds = 60
 #        Default: ""
 
 Voice.AllowedExternalUsers = ""
-
-#    Voice.GroupAlwaysAudible
-#        DE: 1 = Gruppen-/Raidmitglieder sind immer voll hoerbar (auch auf anderen Maps/in Instanzen);
-#            ihre Position bestimmt nur die Richtung, nie die Lautstaerke. Fremde nur in Hoerweite.
-#        EN: 1 = party/raid members are always fully audible (also on other maps/in instances);
-#            their position only sets the direction, never the volume. Strangers only within range.
-#        Default: 1
-
-Voice.GroupAlwaysAudible = 1

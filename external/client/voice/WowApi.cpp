@@ -12,6 +12,17 @@ namespace wow
         return addr && ReadProcessMemory(GetCurrentProcess(), reinterpret_cast<LPCVOID>(addr), out, len, &got) && got == len;
     }
 
+    bool Guarded(void (*fn)(void*), void* ctx)
+    {
+#ifdef _MSC_VER
+        __try { fn(ctx); return true; }
+        __except (EXCEPTION_EXECUTE_HANDLER) { return false; }
+#else
+        fn(ctx);   // DE: MinGW hat kein __try. EN: MinGW has no __try.
+        return true;
+#endif
+    }
+
     uint64_t ActivePlayerGuid()
     {
         return reinterpret_cast<uint64_t(__cdecl*)()>(addr::GetActivePlayer)();

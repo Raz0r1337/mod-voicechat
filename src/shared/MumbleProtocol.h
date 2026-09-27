@@ -107,6 +107,9 @@ namespace MumbleProto
         bool Next(Field& f)
         {
             if (_p >= _end || !_ok) return false;
+            // DE: Keine Reste des vorigen Felds (falscher Wire-Typ -> leer statt alter Daten).
+            // EN: no leftovers from the previous field (wrong wire type -> empty instead of old data).
+            f.value = 0; f.data = nullptr; f.size = 0;
             uint64_t key;
             if (!ReadVarint(key)) return Fail();
             f.number = uint32_t(key >> 3);

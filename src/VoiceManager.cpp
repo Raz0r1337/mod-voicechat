@@ -100,6 +100,18 @@ namespace VoiceChat
         }
         if (restart)
             Start();
+
+        // DE: Per Reload abgeschaltet (oder Start fehlgeschlagen) -> Clients informieren, sie trennen sich selbst.
+        // EN: switched off via reload (or start failed) -> tell the clients, they disconnect themselves.
+        if (restart && !_started)
+        {
+            std::lock_guard<std::mutex> lock(_mutex);
+            for (auto& [low, vp] : _players)
+                if (Player* player = ObjectAccessor::FindConnectedPlayer(vp.guid))
+                    SendDisabled(player, _cfg.enable ? "unavailable" : "disabled");
+            _players.clear();
+            _bySession.clear();
+        }
     }
 
     void VoiceManager::Start()
@@ -231,6 +243,8 @@ namespace VoiceChat
         VoicePlayer* vp = Find(player);
         if (vp && now - vp->lastHello < 2000)
             return;   // DE: Spam-Schutz. EN: spam protection.
+        if (vp)
+            vp->lastHello = now;
 
         if (!_cfg.enable)
             return SendDisabled(player, "disabled");

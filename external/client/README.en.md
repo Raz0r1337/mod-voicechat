@@ -51,6 +51,7 @@ The shared protocol code (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtoc
 
 ## Getting voice.dll
 
+- **Use the MSVC build for testing** (Actions artifact or Visual Studio): only it catches access violations when touching WoW. If an address does not match, it writes a message to `voice.log` and disables the game integration instead of crashing WoW. MinGW builds lack this protection.
 - **Without building:** in the repo under *Actions → client → latest run → Artifacts → `voice-win32`* you find `voice.dll`, `voicecli.exe`, the example `voice.ini` and the loader.
 - **Build it yourself (Windows, Visual Studio 2022):**
   ```bat

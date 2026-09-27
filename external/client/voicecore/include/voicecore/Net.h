@@ -4,6 +4,7 @@
  */
 #pragma once
 
+#include <atomic>
 #include <cstddef>
 #include <cstdint>
 #include <memory>
@@ -21,8 +22,11 @@ namespace voicecore
         ~TlsSocket();
 
         // DE: pinSha256 (Hex, optional) = erwarteter SHA-256 des Server-Zertifikats.
+        //     Verbindungsaufbau und Handshake haben Timeouts und lassen sich per cancel abbrechen.
         // EN: pinSha256 (hex, optional) = expected SHA-256 of the server certificate.
-        bool Connect(const std::string& host, uint16_t port, const std::string& pinSha256, std::string& error);
+        //     Connect and handshake have timeouts and can be aborted via cancel.
+        bool Connect(const std::string& host, uint16_t port, const std::string& pinSha256, std::string& error,
+                     const std::atomic<bool>* cancel = nullptr);
         void Close();
 
         // DE: >0 Bytes, 0 = nichts da, <0 = Fehler/geschlossen. EN: >0 bytes, 0 = nothing, <0 = error/closed.

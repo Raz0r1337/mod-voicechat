@@ -16,6 +16,7 @@
 
 #include <cctype>
 #include <cerrno>
+#include <chrono>
 #include <cstdio>
 #include <cstring>
 
@@ -28,6 +29,8 @@ using socklen_t = int;
 #include <arpa/inet.h>
 #include <fcntl.h>
 #include <netdb.h>
+#include <netinet/in.h>
+#include <netinet/tcp.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -48,6 +51,33 @@ namespace voicecore
         }
 #endif
         return true;
+    }
+
+    namespace
+    {
+        constexpr int CONNECT_TIMEOUT_MS   = 8000;
+        constexpr int HANDSHAKE_TIMEOUT_MS = 10000;
+        constexpr int WRITE_TIMEOUT_MS     = 5000;
+
+        uint64_t NowMs()
+        {
+            return uint64_t(std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now().time_since_epoch()).count());
+        }
+
+        bool Cancelled(const std::atomic<bool>* c) { return c && c->load(); }
+
+        // DE: Wartet max. timeoutMs, bis fd lesbar (write=false) bzw. schreibbar ist. >0 = bereit.
+        // EN: waits up to timeoutMs until fd is readable (write=false) or writable. >0 = ready.
+        int WaitSocket(int fd, bool write, int timeoutMs)
+        {
+            fd_set rs, ws, es;
+            FD_ZERO(&rs); FD_ZERO(&ws); FD_ZERO(&es);
+            FD_SET(fd, write ? &ws : &rs);
+            FD_SET(fd, &es);
+            timeval tv{ timeoutMs / 1000, (timeoutMs % 1000) * 1000 };
+            return select(fd + 1, &rs, &ws, &es, &tv);
+        }
     }
 
     static void SetNonBlocking(int fd)
@@ -91,6 +121,56 @@ namespace voicecore
     TlsSocket::TlsSocket() = default;
     TlsSocket::~TlsSocket() { Close(); }
 
+    // DE: Nicht blockierender TCP-Connect mit Timeout und Abbruch. EN: non-blocking TCP connect with timeout and cancel.
+    static int ConnectTcp(const std::string& host, uint16_t port, const std::atomic<bool>* cancel, std::string& error)
+    {
+        addrinfo hints{}, *res = nullptr;
+        hints.ai_family = AF_UNSPEC;
+        hints.ai_socktype = SOCK_STREAM;
+        hints.ai_protocol = IPPROTO_TCP;
+        if (getaddrinfo(host.c_str(), std::to_string(port).c_str(), &hints, &res) != 0 || !res)
+        {
+            error = "connect: cannot resolve " + host;
+            return -1;
+        }
+        int result = -1;
+        for (addrinfo* a = res; a && result < 0 && !Cancelled(cancel); a = a->ai_next)
+        {
+            int fd = int(socket(a->ai_family, a->ai_socktype, a->ai_protocol));
+            if (fd < 0) continue;
+            SetNonBlocking(fd);
+            int one = 1;
+            setsockopt(fd, IPPROTO_TCP, TCP_NODELAY, reinterpret_cast<const char*>(&one), sizeof(one));
+            if (connect(fd, a->ai_addr, socklen_t(a->ai_addrlen)) == 0)
+            {
+                result = fd;
+                break;
+            }
+#ifdef _WIN32
+            bool pending = WSAGetLastError() == WSAEWOULDBLOCK;
+#else
+            bool pending = errno == EINPROGRESS;
+#endif
+            uint64_t deadline = NowMs() + CONNECT_TIMEOUT_MS;
+            while (pending && !Cancelled(cancel) && NowMs() < deadline)
+            {
+                int s = WaitSocket(fd, true, 100);
+                if (s < 0) break;
+                if (s == 0) continue;
+                int err = 0;
+                socklen_t len = sizeof(err);
+                getsockopt(fd, SOL_SOCKET, SO_ERROR, reinterpret_cast<char*>(&err), &len);
+                if (err == 0) result = fd;
+                break;
+            }
+            if (result < 0) VC_CLOSESOCK(fd);
+        }
+        freeaddrinfo(res);
+        if (result < 0)
+            error = Cancelled(cancel) ? "connect: cancelled" : "connect: cannot reach " + host + ":" + std::to_string(port);
+        return result;
+    }
+
     static std::string MbedError(int rc)
     {
         char buf[160];
@@ -98,7 +178,8 @@ namespace voicecore
         return std::string(buf) + " (" + std::to_string(rc) + ")";
     }
 
-    bool TlsSocket::Connect(const std::string& host, uint16_t port, const std::string& pinSha256, std::string& error)
+    bool TlsSocket::Connect(const std::string& host, uint16_t port, const std::string& pinSha256, std::string& error,
+                            const std::atomic<bool>* cancel)
     {
         Close();
         NetInit();
@@ -114,8 +195,8 @@ namespace voicecore
                                         reinterpret_cast<const unsigned char*>(pers), std::strlen(pers))) != 0)
         { error = "drbg: " + MbedError(rc); return false; }
 
-        if ((rc = mbedtls_net_connect(&d.net, host.c_str(), std::to_string(port).c_str(), MBEDTLS_NET_PROTO_TCP)) != 0)
-        { error = "connect: " + MbedError(rc); return false; }
+        d.net.fd = ConnectTcp(host, port, cancel, error);   // nicht blockierend / non-blocking
+        if (d.net.fd < 0) return false;
 
         mbedtls_ssl_config_defaults(&d.conf, MBEDTLS_SSL_IS_CLIENT, MBEDTLS_SSL_TRANSPORT_STREAM, MBEDTLS_SSL_PRESET_DEFAULT);
         mbedtls_ssl_conf_min_tls_version(&d.conf, MBEDTLS_SSL_VERSION_TLS1_2);
@@ -128,10 +209,14 @@ namespace voicecore
         mbedtls_ssl_set_hostname(&d.ssl, host.c_str());
         mbedtls_ssl_set_bio(&d.ssl, &d.net, mbedtls_net_send, mbedtls_net_recv, nullptr);
 
+        uint64_t deadline = NowMs() + HANDSHAKE_TIMEOUT_MS;
         while ((rc = mbedtls_ssl_handshake(&d.ssl)) != 0)
         {
             if (rc != MBEDTLS_ERR_SSL_WANT_READ && rc != MBEDTLS_ERR_SSL_WANT_WRITE)
             { error = "handshake: " + MbedError(rc); return false; }
+            if (Cancelled(cancel)) { error = "handshake: cancelled"; return false; }
+            if (NowMs() > deadline) { error = "handshake: timeout"; return false; }
+            WaitSocket(d.net.fd, rc == MBEDTLS_ERR_SSL_WANT_WRITE, 100);
         }
 
         // DE: Fingerprint des Server-Zertifikats. EN: fingerprint of the server certificate.
@@ -164,7 +249,6 @@ namespace voicecore
             _remoteIp = ip;
         }
 
-        mbedtls_net_set_nonblock(&d.net);
         d.open = true;
         return true;
     }
@@ -194,13 +278,15 @@ namespace voicecore
     {
         if (!_impl || !_impl->open) return false;
         size_t off = 0;
+        uint64_t deadline = NowMs() + WRITE_TIMEOUT_MS;   // DE: Server liest nicht mehr -> Abbruch / server stopped reading -> give up
         while (off < len)
         {
             int rc = mbedtls_ssl_write(&_impl->ssl, buf + off, len - off);
             if (rc > 0) { off += size_t(rc); continue; }
             if (rc == MBEDTLS_ERR_SSL_WANT_READ || rc == MBEDTLS_ERR_SSL_WANT_WRITE)
             {
-                WaitReadable(-1, -1, 1);
+                if (NowMs() > deadline) return false;
+                WaitSocket(_impl->net.fd, rc == MBEDTLS_ERR_SSL_WANT_WRITE, 10);
                 continue;
             }
             return false;

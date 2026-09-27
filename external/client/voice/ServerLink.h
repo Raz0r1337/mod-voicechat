@@ -34,9 +34,13 @@ namespace voice
 
     private:
         static int __cdecl Handler(void* param, uint32_t opcode, uint32_t time, void* msg);
+        static void InstallHandler(void* self);
+        static void SendOne(void* pkt);
+        static void ReadMvcp(void* ctx);
 
         std::mutex _mutex;
         std::deque<std::vector<uint8_t>> _in, _out;
+        bool _broken = false;   // DE: Zugriffsverletzung -> Link aus / access violation -> link off
         wow::MessageHandler _orig = nullptr;
         void* _origParam = nullptr;
         bool _logged = false;

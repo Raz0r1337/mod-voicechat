@@ -50,10 +50,12 @@ namespace voice
         static LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
         void Tick();
 
+        bool _broken = false;   // DE: Zugriffsverletzung -> Spieldaten aus / access violation -> game data off
         HWND _hwnd = nullptr;
         WNDPROC _orig = nullptr;
         bool _unicode = false;
         std::atomic<bool> _pending{ false };
+        unsigned long long _postedAt = 0;
         mutable std::mutex _mutex;
         GameSnapshot _snap;
     };

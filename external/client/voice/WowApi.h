@@ -72,6 +72,12 @@ namespace wow
     bool PeekPacket(void* msg, const uint8_t*& data, size_t& len);
     void ConsumePacket(void* msg);
 
+    // DE: Fuehrt fn(ctx) aus und faengt Zugriffsverletzungen ab (nur MSVC-Builds, SEH). false = Ausnahme.
+    //     fn darf keine Locks halten und keine Objekte mit Destruktor anlegen, die bei einer Ausnahme wichtig waeren.
+    // EN: runs fn(ctx) and catches access violations (MSVC builds only, SEH). false = exception.
+    //     fn must not hold locks or create objects with destructors that matter on an exception.
+    bool Guarded(void (*fn)(void*), void* ctx);
+
     // DE: Ueberall nutzbar (abgesichertes Lesen). EN: usable anywhere (guarded reads).
     bool SafeRead(uintptr_t addr, void* out, size_t len);
     uint32_t CurrentMapId();

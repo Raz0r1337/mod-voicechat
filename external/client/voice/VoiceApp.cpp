@@ -44,6 +44,11 @@ namespace voice
         Log("mod-voicechat voice.dll started (phase 5), ini " + std::string(haveIni ? "loaded" : "missing -> defaults") +
             ", mode " + _cfg.serverMode);
 
+        if (_cfg.serverMode != "auto" && _cfg.serverMode != "server" && _cfg.serverMode != "standalone")
+        {
+            Log("unknown [Server] Mode '" + _cfg.serverMode + "' -> auto");
+            _cfg.serverMode = "auto";
+        }
         _spatial.minDistance = _cfg.minDistance;
         _spatial.maxDistance = _cfg.maxDistance;
 
@@ -185,7 +190,9 @@ namespace voice
         VoiceProto::Hello h;
         _server.Send(VoiceProto::Encode(h));
         ++_helloTries;
-        _nextHello = now + (_helloTries < AUTO_HELLO_TRIES ? HELLO_INTERVAL_MS : 30000);
+        // DE: auto: nach AUTO_HELLO_TRIES * 5 s Fallback. server: danach nur noch alle 30 s.
+        // EN: auto: fallback after AUTO_HELLO_TRIES * 5 s. server: afterwards only every 30 s.
+        _nextHello = now + (_cfg.serverMode == "auto" || _helloTries < AUTO_HELLO_TRIES ? HELLO_INTERVAL_MS : 30000);
     }
 
     void VoiceApp::HandleMvcp(const std::vector<uint8_t>& m, unsigned long long now)
@@ -215,9 +222,12 @@ namespace voice
                 _srv = c;
                 _srvContext = c.context;
                 {
+                    // DE: Plausibel halten. EN: keep sane.
+                    float minD = c.minDistance >= 0.0f && c.minDistance < 1000.0f ? c.minDistance : _cfg.minDistance;
+                    float maxD = c.maxDistance > minD && c.maxDistance < 5000.0f ? c.maxDistance : minD + 37.0f;
                     std::lock_guard<std::mutex> g(_posMutex);
-                    _spatial.minDistance = c.minDistance;
-                    _spatial.maxDistance = c.maxDistance;
+                    _spatial.minDistance = minD;
+                    _spatial.maxDistance = maxD;
                 }
                 _link = Link::Configured;
                 _bound = false;
@@ -258,9 +268,11 @@ namespace voice
                 Log("voice disabled by the server: " + d.reason);
                 Disconnect("disabled by the server");
                 _link = Link::Disabled;
-                // DE: "unavailable" = Murmur weg -> spaeter erneut; sonst erst nach neuem Betreten der Welt.
-                // EN: "unavailable" = Murmur gone -> retry later; otherwise only after re-entering the world.
-                _nextHello = d.reason == "unavailable" ? now + 30000 : 0;
+                // DE: "unavailable" (Murmur weg) -> in 30 s erneut, "disabled" (Modul aus) -> in 5 min;
+                //     Rechte/Kick -> erst nach neuem Betreten der Welt.
+                // EN: "unavailable" (Murmur gone) -> retry in 30 s, "disabled" (module off) -> in 5 min;
+                //     permissions/kick -> only after re-entering the world.
+                _nextHello = d.reason == "unavailable" ? now + 30000 : d.reason == "disabled" ? now + 300000 : 0;
                 break;
             }
             default:

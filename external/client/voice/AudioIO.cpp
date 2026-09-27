@@ -78,9 +78,16 @@ namespace voice
         cc.periodSizeInMilliseconds = 10;
         cc.dataCallback = OnCapture;
         cc.pUserData = this;
-        if (ma_device_init(&d.ctx, &cc, &d.capture) == MA_SUCCESS && ma_device_start(&d.capture) == MA_SUCCESS)
-            d.capOk = true;
-        else
+        if (ma_device_init(&d.ctx, &cc, &d.capture) == MA_SUCCESS)
+        {
+            d.capOk = true;   // DE: initialisiert -> muss in Stop() freigegeben werden / initialised -> must be freed in Stop()
+            if (ma_device_start(&d.capture) != MA_SUCCESS)
+            {
+                ma_device_uninit(&d.capture);
+                d.capOk = false;
+            }
+        }
+        if (!d.capOk)
             Log("audio: microphone could not be opened (listening only)");
 
         ma_device_config pc = ma_device_config_init(ma_device_type_playback);
@@ -91,9 +98,16 @@ namespace voice
         pc.periodSizeInMilliseconds = 10;
         pc.dataCallback = OnPlayback;
         pc.pUserData = this;
-        if (ma_device_init(&d.ctx, &pc, &d.playback) == MA_SUCCESS && ma_device_start(&d.playback) == MA_SUCCESS)
+        if (ma_device_init(&d.ctx, &pc, &d.playback) == MA_SUCCESS)
+        {
             d.playOk = true;
-        else
+            if (ma_device_start(&d.playback) != MA_SUCCESS)
+            {
+                ma_device_uninit(&d.playback);
+                d.playOk = false;
+            }
+        }
+        if (!d.playOk)
             Log("audio: output device could not be opened");
 
         Log(std::string("audio: capture=") + (d.capOk ? d.capture.capture.name : "-") + " playback=" + (d.playOk ? d.playback.playback.name : "-"));
