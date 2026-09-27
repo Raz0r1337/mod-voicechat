@@ -1,5 +1,7 @@
 # mod-voicechat
 
+> ⚠️ **WARNUNG: Dieses Projekt befindet sich in einem sehr frühen Stadium. Alles ist noch ungetestet und ungeprüft. Es ist NICHT zum Spielen freigegeben!**
+
 🇬🇧 **[English version](README.en.md)**
 
 Natives 3D-Proximity-Voice für **World of Warcraft 3.3.5a (Build 12340)** und **AzerothCore**, mit **Murmur** (Mumble-Server) als Voice-Backend.
