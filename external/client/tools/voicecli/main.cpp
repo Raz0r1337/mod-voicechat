@@ -14,6 +14,7 @@
 #include "voicecore/AudioMixer.h"
 #include "voicecore/MumbleClient.h"
 #include "voicecore/Spatial.h"
+#include "VoiceProtocol.h"
 #include "voicecore/Transmitter.h"
 
 #include <chrono>
@@ -71,7 +72,8 @@ int main(int argc, char** argv)
     cfg.username = "voicecli";
     double sendTone = 0, expectTone = 0, seconds = 5;
     std::string wav, context;
-    bool hasPos = false, listenPositional = false, expectSilence = false;
+    bool hasPos = false, listenPositional = false, expectSilence = false, expectNothing = false;
+    std::string bindNonce, botName = "SuperUser";
     spatial::Vec3 myPos;
     spatial::Listener listener;
     auto parseVec = [](const std::string& v) { spatial::Vec3 r; std::sscanf(v.c_str(), "%f,%f,%f", &r.x, &r.y, &r.z); return r; };
@@ -93,6 +95,9 @@ int main(int argc, char** argv)
         else if (a == "--listen-pos") { listener.pos = parseVec(next()); listenPositional = true; }
         else if (a == "--context") context = next();
         else if (a == "--expect-silence") expectSilence = true;
+        else if (a == "--expect-nothing") expectNothing = true;
+        else if (a == "--bind") bindNonce = next();
+        else if (a == "--bot") botName = next();
         else { std::fprintf(stderr, "unknown argument %s\n", a.c_str()); return 2; }
     }
 
@@ -144,6 +149,30 @@ int main(int argc, char** argv)
     }
 
     if (!context.empty()) client.SetPluginContext(context, "");
+    if (!bindNonce.empty())
+    {
+        // DE: Wie voice.dll: BIND an den Bot, dann warten bis der Bot uns verschoben hat.
+        // EN: like voice.dll: BIND to the bot, then wait until the bot moved us.
+        uint32_t botSession = 0, myChannel = 0;
+        auto until = Clock::now() + std::chrono::seconds(10);
+        while (Clock::now() < until && !botSession)
+        {
+            for (auto& u : client.Users()) if (u.name == botName) botSession = u.session;
+            if (!botSession) std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+        if (!botSession) { std::printf("[%s] FAIL: bot '%s' not found\n", cfg.username.c_str(), botName.c_str()); return 1; }
+        MumbleProto::TextMessage t;
+        t.sessions.push_back(botSession);
+        t.message = VoiceProto::BindText(bindNonce);
+        client.SendMessage(MumbleProto::Tcp::TextMessage, t.Encode());
+        while (Clock::now() < until && myChannel == 0)
+        {
+            for (auto& u : client.Users()) if (u.session == client.Session()) myChannel = u.channel;
+            if (!myChannel) std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+        std::printf("[%s] moved to channel '%s' (%u)\n", cfg.username.c_str(), client.ChannelName(myChannel).c_str(), myChannel);
+        if (!myChannel) return 1;
+    }
     if (sendTone > 0) std::this_thread::sleep_for(std::chrono::milliseconds(1000));   // Gegenstelle abwarten / wait for peer
     tx.SetMode(sendTone > 0 ? TransmitMode::Continuous : TransmitMode::PushToTalk);
 
@@ -185,6 +214,14 @@ int main(int argc, char** argv)
     if (!wav.empty()) WriteWav(wav, record);
     client.Stop();
 
+    if (expectNothing)
+    {
+        int received = 0;
+        for (auto& kv : packetsFrom) received += kv.second;
+        bool ok = received == 0;
+        std::printf("[%s] %s: %d packets received (expected none)\n", cfg.username.c_str(), ok ? "PASS" : "FAIL", received);
+        return ok ? 0 : 1;
+    }
     if (expectSilence)
     {
         int received = 0;
