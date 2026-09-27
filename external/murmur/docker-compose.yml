@@ -1,0 +1,24 @@
+# mod-voicechat - Murmur via Docker (official image mumblevoip/mumble-server)
+# DE: Start: docker compose up -d      EN: start: docker compose up -d
+# DE: Die MUMBLE_CONFIG_*-Variablen entsprechen den Schluesseln aus mumble-server.ini.example.
+# EN: The MUMBLE_CONFIG_* variables map to the keys from mumble-server.ini.example.
+services:
+  mumble-server:
+    image: mumblevoip/mumble-server:latest
+    container_name: mumble-server
+    restart: unless-stopped
+    ports:
+      - "64738:64738/tcp"
+      - "64738:64738/udp"
+    environment:
+      MUMBLE_CONFIG_OPUSTHRESHOLD: "0"
+      MUMBLE_CONFIG_BANDWIDTH: "96000"
+      MUMBLE_CONFIG_USERS: "200"
+      MUMBLE_CONFIG_REMEMBERCHANNEL: "false"
+      MUMBLE_CONFIG_SERVERPASSWORD: ""
+      MUMBLE_CONFIG_WELCOMETEXT: "mod-voicechat test server"
+      # DE: SuperUser-Passwort (wird ab Phase 5 fuer den AzerothCore-Bot gebraucht)
+      # EN: SuperUser password (needed for the AzerothCore bot from phase 5 on)
+      MUMBLE_SUPERUSER_PASSWORD: "change-me"
+    volumes:
+      - ./data:/data

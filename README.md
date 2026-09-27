@@ -6,7 +6,7 @@
 
 Natives 3D-Proximity-Voice für **World of Warcraft 3.3.5a (Build 12340)** und **AzerothCore**, mit **Murmur** (Mumble-Server) als Voice-Backend.
 
-> **Status: Phase 2 abgeschlossen (Recherche + Architektur).** Es gibt noch keinen lauffähigen Code.
+> **Status: Phase 3 (Proof of Concept) gebaut, wartet auf den ersten Test in WoW.** Spieler können sich per Sprache verständigen, noch ohne Positionen und ohne AzerothCore-Anbindung.
 > Den vollständigen Bericht findest du unter [docs/de/BERICHT.md](docs/de/BERICHT.md).
 
 ## Ziel
@@ -32,7 +32,7 @@ WoW.exe + voice.dll ── Opus / Mumble-Protokoll (TLS + UDP) ──► Murmur 
 - **AzerothCore** verbindet sich als Bot mit Murmur, prüft Rechte, bindet Mumble-Sessions an Charaktere und verschiebt Spieler bei Map- und Instanzwechsel.
 - Am AzerothCore-Core sind **keine Änderungen** nötig.
 
-## Repository-Struktur (geplant)
+## Repository-Struktur
 
 ```text
 mod-voicechat/          ← als modules/mod-voicechat in AzerothCore klonen
@@ -45,13 +45,11 @@ mod-voicechat/          ← als modules/mod-voicechat in AzerothCore klonen
 └── docs/{de,en}/       Dokumentation
 ```
 
-## Installation
+## Installation (Stand Phase 3, nur zum Testen)
 
-Folgt, sobald der erste Proof of Concept läuft (Phase 3). Geplant ist:
-1. `git clone` nach `azerothcore-wotlk/modules/mod-voicechat`, danach CMake und Build. Das Modul wird automatisch erkannt.
-2. `mod_voicechat.conf` anpassen (Murmur-Host, Bot-Zugangsdaten, Reichweite).
-3. Murmur mit der Vorlage aus `external/murmur/` aufsetzen.
-4. `Wow.exe` patchen und `voice.dll` ins WoW-Verzeichnis legen.
+1. **Murmur aufsetzen:** siehe [`external/murmur/README.md`](external/murmur/README.md) (Linux-Paket, Docker oder Windows).
+2. **Client:** `Wow.exe` mit dem Loader patchen und `voice.dll` + `voice.ini` in den WoW-Ordner legen, siehe [`external/client/README.md`](external/client/README.md) (Schritt-für-Schritt-Test inklusive).
+3. **AzerothCore-Modul:** Das Modul kann schon nach `azerothcore-wotlk/modules/mod-voicechat` geklont werden und wird erkannt, **hat in Phase 3 aber noch keine Funktion.** Rechte, Map/Instanz und Login/Logout übernimmt es ab Phase 5, dann kommt auch `mod_voicechat.conf` dazu.
 
 ## Roadmap
 
