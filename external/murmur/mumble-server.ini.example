@@ -3,14 +3,17 @@
 ;  Stand Phase 3 / as of phase 3
 ;
 ;  DE: Nur die fuer mod-voicechat wichtigen Werte. Alles andere bleibt auf
-;      Murmur-Standard. Linux: /etc/mumble-server.ini
+;      Murmur-Standard. Linux (Paket): /etc/mumble/mumble-server.ini
 ;  EN: Only the values that matter for mod-voicechat. Everything else stays
-;      at Murmur defaults. Linux: /etc/mumble-server.ini
+;      at Murmur defaults. Linux (package): /etc/mumble/mumble-server.ini
 ; ============================================================
 
-; DE: Datenbank (Linux-Paket-Standard). EN: database (Linux package default).
-database=/var/lib/mumble-server/mumble-server.sqlite
-logfile=/var/log/mumble-server/mumble-server.log
+; DE: database/logfile NICHT setzen, wenn das Linux-Paket genutzt wird (Standard:
+;     /var/lib/mumble-server/, Log im systemd-Journal). Nur fuer Windows/eigene Installationen.
+; EN: do NOT set database/logfile when using the Linux package (default:
+;     /var/lib/mumble-server/, log in the systemd journal). Only for Windows/custom installs.
+;database=mumble-server.sqlite
+;logfile=mumble-server.log
 
 ; DE: leer = alle Netzwerkkarten. TCP UND UDP 64738 in der Firewall freigeben!
 ; EN: empty = all interfaces. Open TCP AND UDP 64738 in the firewall!
