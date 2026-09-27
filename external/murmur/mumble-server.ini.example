@@ -1,0 +1,54 @@
+; ============================================================
+;  mod-voicechat - Murmur (mumble-server 1.5) Beispielkonfiguration / example configuration
+;  Stand Phase 3 / as of phase 3
+;
+;  DE: Nur die fuer mod-voicechat wichtigen Werte. Alles andere bleibt auf
+;      Murmur-Standard. Linux: /etc/mumble-server.ini
+;  EN: Only the values that matter for mod-voicechat. Everything else stays
+;      at Murmur defaults. Linux: /etc/mumble-server.ini
+; ============================================================
+
+; DE: Datenbank (Linux-Paket-Standard). EN: database (Linux package default).
+database=/var/lib/mumble-server/mumble-server.sqlite
+logfile=/var/log/mumble-server/mumble-server.log
+
+; DE: leer = alle Netzwerkkarten. TCP UND UDP 64738 in der Firewall freigeben!
+; EN: empty = all interfaces. Open TCP AND UDP 64738 in the firewall!
+host=
+port=64738
+
+; DE: optional. Muss dann in voice.ini unter [Server] Password stehen.
+; EN: optional. Must then be set in voice.ini under [Server] Password.
+serverpassword=
+
+; DE: Pflicht: Opus sofort fuer alle aktivieren (voice.dll spricht nur Opus).
+; EN: required: enable Opus for everyone right away (voice.dll only speaks Opus).
+opusthreshold=0
+
+; DE: Max. Bandbreite pro Spieler in Bit/s (voice.dll: 32 kbit/s Opus + Overhead).
+; EN: max bandwidth per player in bit/s (voice.dll: 32 kbit/s Opus + overhead).
+bandwidth=96000
+users=200
+
+; DE: Schutz gegen Spam/Flood. EN: protection against spam/flood.
+messageburst=5
+messagelimit=1
+autobanAttempts=10
+autobanTimeframe=120
+autobanTime=300
+
+; DE: Kein Client-Zertifikat noetig (Phase 3). EN: no client certificate required (phase 3).
+certrequired=false
+allowping=true
+; DE: Spieler landen immer im Root-Channel (spaeter verschiebt sie der AzerothCore-Bot).
+; EN: players always land in the root channel (later the AzerothCore bot moves them).
+rememberchannel=false
+
+welcometext="mod-voicechat test server"
+
+; DE: Optional eigenes TLS-Zertifikat (sonst erzeugt Murmur ein selbstsigniertes).
+;     Den SHA-256-Fingerprint kann man in voice.ini als CertSha256 festnageln.
+; EN: optional own TLS certificate (otherwise Murmur creates a self-signed one).
+;     Its SHA-256 fingerprint can be pinned in voice.ini as CertSha256.
+;sslCert=
+;sslKey=
