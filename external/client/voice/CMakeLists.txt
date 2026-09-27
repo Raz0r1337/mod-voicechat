@@ -9,7 +9,8 @@ add_library(voice SHARED
     GameThread.cpp
     ServerLink.cpp
     NativeUi.cpp
-    GameDucking.cpp)
+    GameDucking.cpp
+    LuaLoopback.cpp)
 
 set_target_properties(voice PROPERTIES PREFIX "" OUTPUT_NAME "voice")
 target_include_directories(voice PRIVATE ${miniaudio_SOURCE_DIR})

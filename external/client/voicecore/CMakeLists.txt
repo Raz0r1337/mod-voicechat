@@ -9,7 +9,8 @@ add_library(voicecore STATIC
     src/Transmitter.cpp
     src/Spatial.cpp
     src/Occlusion.cpp
-    src/Ducking.cpp)
+    src/Ducking.cpp
+    src/LoopbackTest.cpp)
 
 target_include_directories(voicecore
     PUBLIC

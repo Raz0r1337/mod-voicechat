@@ -90,6 +90,15 @@ namespace wow
         return true;
     }
 
+    void RegisterLuaFunction(const char* name, LuaCFunction fn)
+    {
+        reinterpret_cast<void(__cdecl*)(const char*, LuaCFunction)>(addr::FrameScriptRegister)(name, fn);
+    }
+
+    int LuaArgCount(void* L) { return reinterpret_cast<int(__cdecl*)(void*)>(addr::LuaGetTop)(L); }
+    double LuaNumberArg(void* L, int index) { return reinterpret_cast<double(__cdecl*)(void*, int)>(addr::LuaToNumber)(L, index); }
+    void LuaPushNumber(void* L, double v) { reinterpret_cast<void(__cdecl*)(void*, double)>(addr::LuaPushNumber)(L, v); }
+
     void LuaExecute(const char* code)
     {
         reinterpret_cast<void(__cdecl*)(const char*, const char*, int)>(addr::FrameScriptExecute)(code, "mod-voicechat", 0);

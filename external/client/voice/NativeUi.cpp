@@ -4,6 +4,7 @@
  */
 #include "NativeUi.h"
 #include "Config.h"
+#include "LuaLoopback.h"
 #include "WowApi.h"
 
 #include <cstdlib>
@@ -282,6 +283,13 @@ end
             _nextInstall = now + 5000;
             std::string code = std::string(kInstall) + "\nMVC.SetDevices(" + LuaList(capture) + "," + LuaList(playback) +
                                ")\nMVC.Sync(" + LuaSet(talking) + "," + LuaSet(voice) + ")\n";
+            // DE: Mikrofontest-Funktionen (nach /reload neu registrieren). EN: microphone test functions (re-register after /reload).
+            if (!wow::Guarded(&RegisterLoopbackFunctions, nullptr))
+            {
+                _broken = true;
+                Log("NativeUi: access violation in FrameScript_RegisterFunction - Blizzard UI integration disabled");
+                return;
+            }
             if (!wow::Guarded(&RunLua, const_cast<char*>(code.c_str())))
             {
                 _broken = true;

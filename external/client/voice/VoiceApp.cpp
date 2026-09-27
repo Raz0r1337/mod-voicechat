@@ -18,6 +18,7 @@
  *     If the server does not answer (Mode=auto), everything runs standalone as in phase 4.
  */
 #include "VoiceApp.h"
+#include "LuaLoopback.h"
 
 #include <algorithm>
 #include <cmath>
@@ -82,10 +83,15 @@ namespace voice
             }
             _client.SendAudio(p, n, term, has ? pos : nullptr, uint32_t(target));
         };
-        _audio.onCapture = [this](const float* mono, size_t frames) { _tx.PushPcm(mono, frames); };
+        _audio.onCapture = [this](const float* mono, size_t frames) {
+            _tx.PushPcm(mono, frames);
+            _loop.OnCapture(mono, frames);
+        };
         _audio.onPlayback = [this](float* stereo, size_t frames) {
             _mixer.Mix(stereo, frames, [this](uint32_t s) { return GainFor(s); });
+            _loop.MixPlayback(stereo, frames);
         };
+        BindLoopback(&_loop);
         _client.onAudio = [this](const MumbleProto::UdpAudio& a) {
             {
                 std::lock_guard<std::mutex> g(_posMutex);
@@ -465,6 +471,8 @@ namespace voice
             _tx.SetVadThreshold(_cfg.vadThreshold);
             _tx.SetInputGain(_cfg.inputGain);
             _mixer.SetMasterVolume(_cfg.outputVolume);
+            _loop.SetInputGain(_cfg.inputGain);
+            _loop.SetOutputVolume(_cfg.outputVolume);
             if (!_pttBinding.empty()) { _pttBinding.clear(); _pttKeys = { _cfg.pushToTalkKey }; }
             return;
         }
@@ -474,6 +482,8 @@ namespace voice
         _tx.SetVadThreshold(0.005f + (1.0f - ws.vadSensitivity) * 0.05f);
         _tx.SetInputGain(ws.inputGain);
         _mixer.SetMasterVolume(ws.outputVolume);
+        _loop.SetInputGain(ws.inputGain);
+        _loop.SetOutputVolume(ws.outputVolume);
         std::string binding = ws.pushToTalk.empty() ? std::string("-") : ws.pushToTalk;
         if (binding != _pttBinding)
         {
@@ -503,6 +513,17 @@ namespace voice
 
     void VoiceApp::UpdateDevices(unsigned long long now)
     {
+        // DE: Mikrofontest braucht Audio auch ohne Verbindung. EN: the microphone test needs audio even without a connection.
+        if (_loop.Active() && !_audio.Running())
+        {
+            DesiredDevices(_curIn, _curOut);
+            _audioForTest = _audio.Start(_curIn, _curOut);
+        }
+        else if (_audioForTest && !_loop.Active() && !_active)
+        {
+            _audio.Stop();
+            _audioForTest = false;
+        }
         if (_nativeUi && now >= _nextDevEnum)
         {
             // DE: Liste fuers Menue auffrischen (Headset ein-/ausgesteckt). EN: refresh the menu list (headset plugged in/out).

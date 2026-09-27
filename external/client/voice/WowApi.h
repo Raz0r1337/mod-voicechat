@@ -35,7 +35,11 @@ namespace wow
         constexpr uintptr_t DataStoreRelease      = 0x00403880;  // __thiscall                              (Phase 5)
         constexpr uintptr_t TraceLine             = 0x007A3B70;  // bool __cdecl(start*, end*, hit*|0, float* fraction, flags, 0)
         constexpr uint32_t  TraceLosFlags         = 0x00100111;  // wie WoWs eigener Aufruf 0x77F550 / as WoW's own call at 0x77F550
-        constexpr uintptr_t FrameScriptRegister   = 0x00817F90;  // __cdecl(name, fn)                       (ungenutzt / unused)
+        constexpr uintptr_t FrameScriptRegister   = 0x00817F90;  // void __cdecl(name, lua_CFunction) -> globale Funktion / global function
+        constexpr uintptr_t LuaStatePtr           = 0x00D3F78C;  // lua_State* (FrameScript)
+        constexpr uintptr_t LuaGetTop             = 0x0084DBD0;  // int __cdecl(L)
+        constexpr uintptr_t LuaToNumber           = 0x0084E030;  // double __cdecl(L, idx)   (aus Lua GetCVar-Nachbarn verifiziert / verified)
+        constexpr uintptr_t LuaPushNumber         = 0x0084E2A0;  // void __cdecl(L, double)  (IsVoiceChatAllowedByServer 0x4FCCC8)
         constexpr uintptr_t FrameScriptExecute    = 0x00819210;  // void __cdecl(code, chunkName, taint) - 0 = sicher/secure (Phase 7)
         constexpr uintptr_t CVarLookup            = 0x00767460;  // CVar* __cdecl(name)  (aus Lua GetCVar 0x510040 / from Lua GetCVar)
         constexpr uint32_t  CVarStringValue       = 0x28;        // char* Wert / value
@@ -92,6 +96,12 @@ namespace wow
     //     GetCVar: false = CVar unbekannt. EN: false = unknown CVar.
     bool GetCVar(const char* name, char* out, size_t outSize);
     bool SetCVar(const char* name, const char* value);
+    // DE: Lua-C-API (nur im Hauptthread, innerhalb registrierter Funktionen). EN: Lua C API (main thread, inside registered functions).
+    using LuaCFunction = int(__cdecl*)(void* L);
+    void RegisterLuaFunction(const char* name, LuaCFunction fn);
+    int LuaArgCount(void* L);
+    double LuaNumberArg(void* L, int index);
+    void LuaPushNumber(void* L, double v);
     void LuaExecute(const char* code);
     void SetServerVoiceAllowed();   // DE: wie SMSG_FEATURE_SYSTEM_STATUS beim Login (still). EN: like at login (silent).
 

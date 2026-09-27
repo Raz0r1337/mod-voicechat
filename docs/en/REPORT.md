@@ -286,7 +286,11 @@ The runtime test is still pending.
 - **Crash protection and tests:** all calls are under the SEH guard. The Lua bridge is tested with Lua 5.1 and mocked WoW functions.
 - **Device selection (phase 8a):** the Lua bridge replaces `Sound_ChatSystem_GetNum/…DriverNameByIndex` and `VoiceEnumerate/Select*Device` with voice.dll's WASAPI device list (index 0 = default). voice.dll reads `Sound_VoiceChatInput/OutputDriverIndex` and reopens the devices on change.
 - **Lowering game sounds (phase 8b):** `CVar::Set` (0x7668C0, thiscall with 5 arguments, like Lua `SetCVar` at 0x514CD2) fades `Sound_SFX/Music/AmbienceVolume` to "original · factor" (sliders `ChatSound/Music/AmbienceVolume`). The original values are stored in `voice.duck` beforehand; a crash is repaired on the next start (also at the login screen). The logic lives, testable, in `voicecore::Ducking`.
-- **Open:** microphone test (loopback of the old engine) and the talker list `VoiceChatTalkers` (needs the session API).
+- **Microphone test (phase 8c):**
+  - Via `FrameScript_RegisterFunction` (0x817F90: `pushcclosure`, `pushstring`, `insert`, `rawset` into the globals), voice.dll registers its own C functions under Blizzard's names: `VoiceChat_Record/StopRecording/Play/StopPlayingLoopbackSound`, `VoiceChat_Is{Recording,Playing}LoopbackSound` (returns 0/1 as a number, as the menu expects) and `VoiceChat_GetCurrentMicrophoneSignalLevel` (0–100).
+  - Lua C API: `lua_gettop` 0x84DBD0, `lua_tonumber` 0x84E030, `lua_pushnumber` 0x84E2A0.
+  - The logic lives in `voicecore::LoopbackTest`.
+- **Open:** the talker list `VoiceChatTalkers` (needs the session API).
 
 ## 4. Codec
 

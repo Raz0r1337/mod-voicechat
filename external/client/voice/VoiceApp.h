@@ -12,6 +12,7 @@
 #include "ServerLink.h"
 
 #include "voicecore/AudioMixer.h"
+#include "voicecore/LoopbackTest.h"
 #include "voicecore/MumbleClient.h"
 #include "voicecore/Occlusion.h"
 #include "voicecore/Spatial.h"
@@ -59,6 +60,8 @@ namespace voice
         ServerLink _server;
         NativeUi _ui;
         GameDucking _duck;
+        voicecore::LoopbackTest _loop;   // Mikrofontest im Voice-Menue / microphone test in the voice menu
+        bool _audioForTest = false;
         bool _nativeUi = false;          // DE: Server erlaubt + voice.ini will / server allows + voice.ini wants
         bool _userOff = false;           // DE: im WoW-Menue ausgeschaltet / switched off in the WoW menu
         std::string _pttBinding;
