@@ -73,7 +73,8 @@ int main(int argc, char** argv)
     double sendTone = 0, expectTone = 0, seconds = 5;
     std::string wav, context;
     bool hasPos = false, listenPositional = false, expectSilence = false, expectNothing = false;
-    std::string bindNonce, botName = "SuperUser";
+    std::string bindNonce, botName = "SuperUser", whisperTo;
+    uint32_t audioTarget = MumbleProto::TARGET_NORMAL;
     spatial::Vec3 myPos;
     spatial::Listener listener;
     auto parseVec = [](const std::string& v) { spatial::Vec3 r; std::sscanf(v.c_str(), "%f,%f,%f", &r.x, &r.y, &r.z); return r; };
@@ -98,6 +99,7 @@ int main(int argc, char** argv)
         else if (a == "--expect-nothing") expectNothing = true;
         else if (a == "--bind") bindNonce = next();
         else if (a == "--bot") botName = next();
+        else if (a == "--whisper-to") whisperTo = next();
         else { std::fprintf(stderr, "unknown argument %s\n", a.c_str()); return 2; }
     }
 
@@ -127,7 +129,7 @@ int main(int argc, char** argv)
     }
     spatial::Vec3 myMumble = spatial::WowToMumble(myPos);
     float myPos3[3] = { myMumble.x, myMumble.y, myMumble.z };
-    tx.onPacket = [&](const uint8_t* p, size_t n, bool term) { client.SendAudio(p, n, term, hasPos ? myPos3 : nullptr); };
+    tx.onPacket = [&](const uint8_t* p, size_t n, bool term) { client.SendAudio(p, n, term, hasPos ? myPos3 : nullptr, audioTarget); };
     spatial::Params params;
     AudioMixer::GainFn gainFn = nullptr;
     if (listenPositional)
@@ -164,7 +166,7 @@ int main(int argc, char** argv)
         MumbleProto::TextMessage t;
         t.sessions.push_back(botSession);
         t.message = VoiceProto::BindText(bindNonce);
-        client.SendMessage(MumbleProto::Tcp::TextMessage, t.Encode());
+        client.SendTcp(MumbleProto::Tcp::TextMessage, t.Encode());
         while (Clock::now() < until && myChannel == 0)
         {
             for (auto& u : client.Users()) if (u.session == client.Session()) myChannel = u.channel;
@@ -172,6 +174,21 @@ int main(int argc, char** argv)
         }
         std::printf("[%s] moved to channel '%s' (%u)\n", cfg.username.c_str(), client.ChannelName(myChannel).c_str(), myChannel);
         if (!myChannel) return 1;
+    }
+    if (!whisperTo.empty())
+    {
+        // DE: Wie voice.dll mit NEARBY: Whisper-Ziel 1 = diese Session. EN: like voice.dll with NEARBY: whisper target 1 = this session.
+        uint32_t target = 0;
+        auto until = Clock::now() + std::chrono::seconds(5);
+        while (Clock::now() < until && !target)
+        {
+            for (auto& u : client.Users()) if (u.name == whisperTo) target = u.session;
+            if (!target) std::this_thread::sleep_for(std::chrono::milliseconds(50));
+        }
+        if (!target) { std::printf("[%s] FAIL: whisper target '%s' not found\n", cfg.username.c_str(), whisperTo.c_str()); return 1; }
+        client.SendTcp(MumbleProto::Tcp::VoiceTarget, MumbleProto::EncodeVoiceTargetSessions(1, { target }));
+        audioTarget = 1;
+        std::printf("[%s] whispering to %s (%u)\n", cfg.username.c_str(), whisperTo.c_str(), target);
     }
     if (sendTone > 0) std::this_thread::sleep_for(std::chrono::milliseconds(1000));   // Gegenstelle abwarten / wait for peer
     tx.SetMode(sendTone > 0 ? TransmitMode::Continuous : TransmitMode::PushToTalk);

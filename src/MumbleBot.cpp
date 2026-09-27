@@ -380,15 +380,23 @@ namespace VoiceChat
             w.Bool(2, true);   // inherit_acls
             if (!lobby)
             {
-                // DE: Alle: kein Betreten/Sprechen/Fluestern/Text/Mithoeren/Channels. "in": Sprechen+Fluestern nur im eigenen Channel.
-                // EN: everyone: no enter/speak/whisper/text/listen/channels. "in": speak+whisper only in the own channel.
+                // DE: Alle: kein Betreten/Sprechen/Text/Mithoeren/Channels. Sprechen nur "in" (eigener Channel).
+                //     Fluestern ueberall erlaubt (Gruppen ueber Maps hinweg); welche Stimmen abgespielt werden,
+                //     entscheidet der Client anhand der Listen vom Worldserver (NEARBY: nah + Gruppe).
+                // EN: everyone: no enter/speak/text/listen/channels. Speak only "in" (own channel).
+                //     Whisper allowed everywhere (groups across maps); which voices are played is decided
+                //     by the client using the lists from the worldserver (NEARBY: near + group).
                 Writer deny;
                 deny.Bool(1, true); deny.Bool(2, true); deny.Str(5, "all");
-                deny.U32(7, PERM_ENTER | PERM_SPEAK | PERM_WHISPER | PERM_TEXT | PERM_MAKE_CHANNEL | PERM_MAKE_TEMP | PERM_LINK | PERM_LISTEN);
+                deny.U32(7, PERM_ENTER | PERM_SPEAK | PERM_TEXT | PERM_MAKE_CHANNEL | PERM_MAKE_TEMP | PERM_LINK | PERM_LISTEN);
                 w.Msg(4, deny);
+                Writer whisper;
+                whisper.Bool(1, true); whisper.Bool(2, true); whisper.Str(5, "all");
+                whisper.U32(6, PERM_WHISPER);
+                w.Msg(4, whisper);
                 Writer in;
                 in.Bool(1, true); in.Bool(2, true); in.Str(5, "in");
-                in.U32(6, PERM_SPEAK | PERM_WHISPER);
+                in.U32(6, PERM_SPEAK);
                 w.Msg(4, in);
             }
             else

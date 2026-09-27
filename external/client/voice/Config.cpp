@@ -48,6 +48,7 @@ namespace voice
     {
         if (GetFileAttributesA(path.c_str()) == INVALID_FILE_ATTRIBUTES)
             return false;
+        serverMode = Get(path, "Server", "Mode", serverMode);
         host = Get(path, "Server", "Host", host);
         port = uint16_t(GetPrivateProfileIntA("Server", "Port", port, path.c_str()));
         password = Get(path, "Server", "Password", password);

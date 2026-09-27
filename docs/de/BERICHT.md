@@ -221,6 +221,29 @@ Murmur weg          : Client-Backoff-Reconnect; UI zeigt Status (VOICE_STATUS_UP
 
 ---
 
+### 3.10 Umsetzung Phase 5: Abweichungen vom Plan
+
+| Plan | Umgesetzt | Grund |
+|---|---|---|
+| Instanz-Channels als temporäre Channels | **permanente** Channels, die der Bot aufräumt (`Voice.Bot.EmptyChannelTimeout`) | Murmur zieht den Ersteller eines temporären Channels hinein, also würde der Bot selbst verschoben |
+| Root verweigert Whisper | **Whisper erlaubt** im Baum `WoW/`, Sprechen nur `@in`. Der Client spielt nur Stimmen ab, die der Server in NEARBY meldet | **Gruppe/Raid ist über Maps hinweg hörbar** (siehe unten). Ein manipulierter Client kann trotzdem niemandem Audio aufzwingen |
+| Kick ungebundener Sessions nach 15 s | `Voice.BindTimeoutSeconds` (Standard 30 s), Ausnahmen per `Voice.AllowedExternalUsers` | Zeit für Verbindungsaufbau über UDP und TLS |
+| Client-Zertifikat | noch keins; die Bindung läuft nur über die Einmal-Nonce (128 Bit, 60 s) | reicht für die Zuordnung, ein Zertifikat kann später dazukommen |
+| Original-Handler von 0x3A0 läuft nie mehr | Pakete ohne `MVC1` gehen an den Original-Handler | weniger Eingriff |
+| Kontext `wow\|realm\|map\|instance` | `wow335\|<Realm>\|<Map>\|<Instanz>[\|A/H]` | Build im Kontext |
+
+**Gruppenregel** (Wunsch aus dem Projekt):
+- **Gruppen- und Raidmitglieder** hört man immer in voller Lautstärke, auch auf anderen Maps oder in Instanzen. Die Position bestimmt nur die Richtung (Panning): keine Entfernungsdämpfung, keine Dämpfung von hinten, keine Occlusion. Ohne Position (andere Map) klingt die Stimme mittig.
+- **Fremde** hört man nur, wenn der Server sie als „in Hörweite“ meldet, und mit zunehmender Entfernung leiser. In Instanzen ist man in der Regel nur mit der eigenen Gruppe, deshalb wirkt die Distanzregel praktisch nur in der offenen Welt.
+- **Senden:** Der Client flüstert an „nah ∪ Gruppe“ (VoiceTarget 1). Der Server schickt beide Listen jede Sekunde (`NEARBY`: Feld 1 = nah, Feld 2 = Gruppe), und nur, wenn sie sich geändert haben.
+
+**H3 (Handler-Übernahme):** Die Disassembly bestätigt:
+- Die Tabelle liegt bei `NetClient+0x53C`, die Parameter bei `+0x19B8`.
+- Der Dispatcher 0x631FE0 ruft `cdecl(param, opcode, time, CDataStore*)` auf.
+- `SetMessageHandler` und `SendPacket` brechen ohne Verbindung mit Fatal Error ab, deshalb prüft voice.dll vorher `[0xC79CF4]`.
+
+Der Laufzeittest steht noch aus.
+
 ## 4. Codec
 
 1. **Welcher Codec in Comsat steckt**, ist ❓ unbekannt. Er ist in keiner erreichbaren Quelle dokumentiert und ließe sich durch statische Analyse (Strings/Signaturen in Wow.exe) bestimmen.

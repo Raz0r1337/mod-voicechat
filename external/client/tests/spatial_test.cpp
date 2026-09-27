@@ -65,6 +65,18 @@ int main()
     CHECK(std::fabs(occ.left - front.left * 0.25f) < 1e-3f);
     CHECK(std::fabs(occ.lowpassHz - 800.0f) < 1.0f);
 
+    // --- Gruppe: nur Richtung, nie leiser / group: direction only, never quieter ---
+    {
+        Params g = p;
+        g.directionOnly = true;
+        SpeakerGain gf = Compute(l, { 500, 0, 0 }, g);                    // weit vorne / far in front
+        CHECK(std::fabs(gf.left - 1.0f) < 1e-3f && std::fabs(gf.right - 1.0f) < 1e-3f);
+        SpeakerGain gb = Compute(l, { -500, 0, 0 }, g, 1.0f, 0.25f, 800.0f); // hinten + verdeckt / behind + occluded
+        CHECK(std::fabs(gb.left - 1.0f) < 1e-3f && gb.lowpassHz == 0.0f);
+        SpeakerGain gl = Compute(l, { 0, 500, 0 }, g);                    // links / left
+        CHECK(gl.left > 0.99f && gl.right < 0.01f);
+    }
+
     // --- Koordinaten hin und zurueck / coordinates round trip ---
     Vec3 w{ 1234.5f, -567.25f, 89.75f };
     Vec3 back = MumbleToWow(WowToMumble(w));

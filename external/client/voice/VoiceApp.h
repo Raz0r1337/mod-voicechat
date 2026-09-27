@@ -1,5 +1,5 @@
 /*
- * mod-voicechat - voice.dll main logic (phase 4: positional voice)
+ * mod-voicechat - voice.dll main logic (phase 5: server integration)
  * SPDX-License-Identifier: GPL-2.0-or-later
  */
 #pragma once
@@ -7,15 +7,20 @@
 #include "AudioIO.h"
 #include "Config.h"
 #include "GameThread.h"
+#include "ServerLink.h"
 
 #include "voicecore/AudioMixer.h"
 #include "voicecore/MumbleClient.h"
 #include "voicecore/Spatial.h"
 #include "voicecore/Transmitter.h"
 
+#include "VoiceProtocol.h"
+
 #include <atomic>
 #include <map>
 #include <mutex>
+#include <set>
+#include <vector>
 
 namespace voice
 {
@@ -26,33 +31,59 @@ namespace voice
         void RequestStop() { _stop = true; }
 
     private:
-        void Connect(const std::string& name);
+        // DE: Zustand der Server-Verbindung (MVCP). EN: state of the server link (MVCP).
+        enum class Link { Off, Hello, Configured, Disabled, Standalone };
+
+        void ResetLink(unsigned long long now);
+        void HandleMvcp(const std::vector<uint8_t>& m, unsigned long long now);
+        void StepHello(unsigned long long now);
+        void StepServer(unsigned long long now);
+        void StepStandalone(unsigned long long now, const GameSnapshot& s, bool fresh);
+        void Connect(const voicecore::ClientConfig& cc);
         void Disconnect(const char* why);
         void UpdateContext(const GameSnapshot& s);
         voicecore::SpeakerGain GainFor(uint32_t session);
 
         Config _cfg;
         GameThread _game;
+        ServerLink _server;
         AudioIO _audio;
         voicecore::MumbleClient _client;
         voicecore::AudioMixer _mixer;
         voicecore::Transmitter _tx;
-        voicecore::spatial::Params _spatial;
 
-        // DE: Position der Sprecher (aus den Audiopaketen, WoW-Koordinaten).
-        // EN: speaker positions (from the audio packets, WoW coordinates).
+        // DE: Von Audio-Thread und Worker genutzt (_posMutex). EN: used by audio thread and worker (_posMutex).
         std::mutex _posMutex;
-        std::map<uint32_t, voicecore::spatial::Vec3> _speakerPos;
+        voicecore::spatial::Params _spatial;
+        std::map<uint32_t, voicecore::spatial::Vec3> _speakerPos;   // WoW-Koordinaten / WoW coordinates
         voicecore::spatial::Listener _listener;
         float _myPos[3] = {};
         bool _hasMyPos = false;
+        bool _serverLists = false;              // Server bestimmt, wer hoerbar ist / server decides who is audible
+        std::set<uint32_t> _nearby, _group;
 
+        // DE: -1 = nicht senden, 0 = normal (Channel), 1 = Whisper-Ziel 1. EN: -1 = don't send, 0 = normal, 1 = whisper target 1.
+        std::atomic<int> _sendTarget{ -1 };
         std::atomic<bool> _stop{ false };
         std::atomic<bool> _lost{ false };
+
         bool _active = false;
-        std::string _currentName;
-        std::string _context;
+        bool _inWorld = false;
+        std::string _charName;
+        std::string _context;                   // gesetzt / applied
         unsigned _retryDelayMs = 2000;
         unsigned long long _nextRetry = 0;
+
+        Link _link = Link::Off;
+        VoiceProto::Config _srv;
+        std::string _srvContext;
+        unsigned long long _nextHello = 0;
+        int _helloTries = 0;
+        unsigned _helloBackoffMs = 2000;
+        bool _bound = false;
+        int _bindTries = 0;
+        unsigned long long _nextBind = 0;
+        std::vector<uint32_t> _target, _targetSent;
+        bool _targetValid = false;
     };
 }

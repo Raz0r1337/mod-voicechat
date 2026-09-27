@@ -31,6 +31,9 @@ namespace voicecore::spatial
         float maxDistance = 40.0f;     // ab hier stumm / silent from here on
         float rearAttenuation = 0.85f; // Pegel direkt hinter dem Hoerer / level right behind the listener
         float rearLowpassHz = 6000.0f; // leichte Dumpfheit hinten / slight muffling behind
+        // DE: Nur Richtung (Gruppe/Raid): nie leiser, keine Hinten-Daempfung, keine Verdeckung.
+        // EN: direction only (party/raid): never quieter, no rear attenuation, no occlusion.
+        bool directionOnly = false;
     };
 
     constexpr float YARDS_TO_METERS = 0.9144f;

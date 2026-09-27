@@ -12,6 +12,7 @@ namespace voice
     struct Config
     {
         // [Server]
+        std::string serverMode = "auto"; // auto | server | standalone
         std::string host = "127.0.0.1";
         uint16_t port = 64738;
         std::string password;

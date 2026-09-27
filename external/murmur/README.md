@@ -22,7 +22,7 @@ sudo systemctl status mumble-server
 
 - **Konfiguration:** `/etc/mumble/mumble-server.ini` (ältere Pakete bis Mumble 1.4: `/etc/mumble-server.ini`)
 - **Log:** `sudo journalctl -u mumble-server -f`
-- **SuperUser-Passwort** (erst ab Phase 5 für den Bot nötig): `sudo mumble-server -ini /etc/mumble/mumble-server.ini -supw <passwort>`
+- **SuperUser-Passwort** (Pflicht für das Modul, der Bot meldet sich damit an): `sudo mumble-server -ini /etc/mumble/mumble-server.ini -supw <passwort>`
 
 ## Variante B: Docker
 
@@ -51,6 +51,17 @@ voicecli.exe --host <server-ip> --user Sender --send-tone 440 --seconds 4
 
 Der Hörer muss `PASS` melden, und in seiner Ausgabe sollte `udp=yes` stehen.
 
-## Was später dazukommt
+## Channels und ACLs (Phase 5, automatisch)
 
-- **Ab Phase 5:** Channel-Struktur und ACLs, damit jeder nur seine Map bzw. Instanz hört, dazu ein Bot-Account für AzerothCore. Vorlage und Setup-Skript folgen dann hier.
+Du musst in Murmur nichts von Hand anlegen. Der Bot des Moduls meldet sich als `SuperUser` an und legt selbst an:
+
+- `WoW/` mit ACL:
+  - Niemand darf selbst Channels betreten, sprechen, Text schreiben, mithören (Listen) oder Channels anlegen.
+  - Sprechen ist nur im eigenen Channel erlaubt (Gruppe `in`).
+  - Flüstern (Whisper) ist erlaubt, damit Gruppenmitglieder sich über Maps hinweg hören. Welche Stimmen ein Client abspielt, bestimmt der Worldserver.
+- `WoW/Lobby`: Hier sitzt der Bot, und hier dürfen Clients ihm die Bindungs-Nonce schreiben.
+- `WoW/<Realm>/Map-<id>[/Inst-<id>]`: Diese Channels werden bei Bedarf angelegt. Leere Channels löscht der Bot nach `Voice.Bot.EmptyChannelTimeout` Sekunden.
+
+Mumble-Nutzer ohne Bindung an einen Charakter werden nach `Voice.BindTimeoutSeconds` gekickt. Ausnahmen (z. B. Admins mit normalem Mumble-Client) trägst du in `Voice.AllowedExternalUsers` ein.
+
+**Rate-Limits:** Murmur verwirft zu schnelle Channel-, ACL- und Text-Nachrichten ohne Rückmeldung (`messagelimit`/`messageburst`). Der Bot drosselt sich deshalb selbst (`Voice.Bot.MessageRate`/`MessageBurst`). Setzt du die Murmur-Werte kleiner als die Vorgabe, musst du die Bot-Werte ebenfalls senken.

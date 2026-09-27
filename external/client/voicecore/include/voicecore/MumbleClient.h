@@ -70,7 +70,7 @@ namespace voicecore
 
         // DE: threadsicher. EN: thread-safe.
         void SendAudio(const uint8_t* opus, size_t len, bool terminator, const float* pos3, uint32_t target = MumbleProto::TARGET_NORMAL);
-        void SendMessage(MumbleProto::Tcp type, std::vector<uint8_t> payload);
+        void SendTcp(MumbleProto::Tcp type, std::vector<uint8_t> payload);
         void SetSelfMute(bool mute, bool deaf);
         void SetPluginContext(const std::string& context, const std::string& identity);
         std::vector<UserInfo> Users() const;

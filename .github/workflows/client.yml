@@ -1,11 +1,11 @@
-# mod-voicechat - client CI: Linux end-to-end test against Murmur + Win32 build of voice.dll
+# mod-voicechat - CI: Linux end-to-end tests against Murmur (client + bot) + Win32 build of voice.dll
 name: client
 
 on:
   push:
-    paths: [ 'external/client/**', 'src/shared/**', '.github/workflows/client.yml' ]
+    paths: [ 'external/client/**', 'external/module-tests/**', 'src/**', '.github/workflows/client.yml' ]
   pull_request:
-    paths: [ 'external/client/**', 'src/shared/**', '.github/workflows/client.yml' ]
+    paths: [ 'external/client/**', 'external/module-tests/**', 'src/**', '.github/workflows/client.yml' ]
   workflow_dispatch:
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
       - name: Install Murmur
         run: |
           sudo apt-get update
-          sudo apt-get install -y mumble-server
+          sudo apt-get install -y mumble-server libboost-dev libssl-dev
           sudo systemctl stop mumble-server || true
 
       - name: Build voicecore + voicecli
@@ -29,6 +29,7 @@ jobs:
         run: |
           mkdir -p /tmp/murmur
           printf 'database=/tmp/murmur/murmur.sqlite\nhost=127.0.0.1\nport=64738\nusers=100\nopusthreshold=0\n' > /tmp/murmur/murmur.ini
+          mumble-server -ini /tmp/murmur/murmur.ini -supw ci-superuser
           mumble-server -ini /tmp/murmur/murmur.ini -fg > /tmp/murmur/stdout.log 2>&1 &
           sleep 3
 
@@ -43,6 +44,15 @@ jobs:
       - name: End-to-end positional test (near / far / other map)
         working-directory: build
         run: ../external/client/tests/e2e_positional.sh tools/voicecli/voicecli
+
+      - name: Build module tests (MumbleBot without AzerothCore)
+        run: |
+          cmake -S external/module-tests -B build-mt -DCMAKE_BUILD_TYPE=Release
+          cmake --build build-mt -j4
+
+      - name: Bot end-to-end test (binding, channels, ACL, group whisper)
+        working-directory: build-mt
+        run: ../external/module-tests/bot_e2e.sh ./bot_test ../build/tools/voicecli/voicecli ci-superuser
 
   windows-win32:
     runs-on: windows-2022

@@ -38,7 +38,7 @@ namespace voicecore::spatial
     {
         float dx = s.x - l.pos.x, dy = s.y - l.pos.y, dz = s.z - l.pos.z;
         float dist = std::sqrt(dx * dx + dy * dy + dz * dz);
-        float level = DistanceGain(dist, p);
+        float level = p.directionOnly ? 1.0f : DistanceGain(dist, p);
 
         SpeakerGain g;
         g.left = g.right = 0.0f;
@@ -56,12 +56,12 @@ namespace voicecore::spatial
         }
 
         // DE: Hinten leicht leiser und dumpfer (Vorne/Hinten-Hinweis). EN: behind slightly quieter and duller.
-        float rear = std::clamp(-front, 0.0f, 1.0f);
+        float rear = p.directionOnly ? 0.0f : std::clamp(-front, 0.0f, 1.0f);
         level *= 1.0f - rear * (1.0f - p.rearAttenuation);
         float lowpass = rear > 0.0f ? p.rearLowpassHz + (1.0f - rear) * (20000.0f - p.rearLowpassHz) : 0.0f;
 
         // DE: Verdeckung (Phase 6). EN: occlusion (phase 6).
-        occlusion = std::clamp(occlusion, 0.0f, 1.0f);
+        occlusion = p.directionOnly ? 0.0f : std::clamp(occlusion, 0.0f, 1.0f);
         if (occlusion > 0.0f)
         {
             level *= 1.0f - occlusion * (1.0f - occlusionGain);

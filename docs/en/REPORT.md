@@ -222,6 +222,29 @@ Murmur gone         : client backoff reconnect; UI shows status (VOICE_STATUS_UP
 
 ---
 
+### 3.10 Phase 5 implementation: deviations from the plan
+
+| Plan | Implemented | Reason |
+|---|---|---|
+| Instance channels as temporary channels | **permanent** channels cleaned up by the bot (`Voice.Bot.EmptyChannelTimeout`) | Murmur pulls the creator into a temporary channel, so the bot itself would be moved |
+| Root denies Whisper | **Whisper allowed** in the `WoW/` tree, speaking only `@in`. The client only plays voices that the server reports in NEARBY | **Party/raid is audible across maps** (see below). A manipulated client still cannot force audio on anyone |
+| Kick unbound sessions after 15 s | `Voice.BindTimeoutSeconds` (default 30 s), exceptions via `Voice.AllowedExternalUsers` | time to set up UDP and TLS |
+| Client certificate | none yet; binding uses only the one-time nonce (128 bit, 60 s) | enough for the mapping, a certificate can be added later |
+| Original 0x3A0 handler never runs again | packets without `MVC1` go to the original handler | less intrusive |
+| Context `wow\|realm\|map\|instance` | `wow335\|<realm>\|<map>\|<instance>[\|A/H]` | build in the context |
+
+**Group rule** (a project requirement):
+- **Party and raid members** are always heard at full volume, even on other maps or in instances. The position only sets the direction (panning): no distance attenuation, no rear damping, no occlusion. Without a position (another map), the voice sounds centred.
+- **Strangers** are only heard when the server reports them as "in range", and they get quieter with distance. In instances you are normally only with your own group, so the distance rule effectively applies only in the open world.
+- **Sending:** the client whispers to "near ∪ group" (VoiceTarget 1). The server sends both lists every second (`NEARBY`: field 1 = near, field 2 = group), and only when they have changed.
+
+**H3 (handler takeover):** the disassembly confirms:
+- The table is at `NetClient+0x53C`, the parameters at `+0x19B8`.
+- Dispatcher 0x631FE0 calls `cdecl(param, opcode, time, CDataStore*)`.
+- `SetMessageHandler` and `SendPacket` abort with a fatal error when there is no connection, so voice.dll checks `[0xC79CF4]` first.
+
+The runtime test is still pending.
+
 ## 4. Codec
 
 1. **Which codec Comsat uses** is ❓ unknown. No reachable source documents it; static analysis (strings/signatures in Wow.exe) could determine it.

@@ -79,7 +79,7 @@ namespace voicecore
         _state = ClientState::Disconnected;
     }
 
-    void MumbleClient::SendMessage(Tcp type, std::vector<uint8_t> payload)
+    void MumbleClient::SendTcp(Tcp type, std::vector<uint8_t> payload)
     {
         std::lock_guard<std::mutex> g(_outMutex);
         _tcpOut.push_back(Frame(type, payload));
@@ -111,7 +111,7 @@ namespace voicecore
         us.session = _session.load();
         us.selfMute = mute || deaf;
         us.selfDeaf = deaf;
-        SendMessage(Tcp::UserState, us.Encode());
+        SendTcp(Tcp::UserState, us.Encode());
     }
 
     void MumbleClient::SetPluginContext(const std::string& context, const std::string& identity)
@@ -120,7 +120,7 @@ namespace voicecore
         us.session = _session.load();
         us.pluginContext = std::vector<uint8_t>(context.begin(), context.end());
         us.pluginIdentity = identity;
-        SendMessage(Tcp::UserState, us.Encode());
+        SendTcp(Tcp::UserState, us.Encode());
     }
 
     std::vector<UserInfo> MumbleClient::Users() const
@@ -333,7 +333,7 @@ namespace voicecore
                 {
                     CryptSetup reply;
                     reply.clientNonce = net.crypt.EncryptIv();
-                    SendMessage(Tcp::CryptSetup, reply.Encode());
+                    SendTcp(Tcp::CryptSetup, reply.Encode());
                 }
                 break;
             }

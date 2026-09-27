@@ -2,19 +2,24 @@
  * mod-voicechat - voice.dll main logic (see VoiceApp.h)
  * SPDX-License-Identifier: GPL-2.0-or-later
  *
- * DE: Ablauf: Welt betreten -> Mikrofon/Lautsprecher oeffnen -> mit Murmur
- *     verbinden (Name = Charakter, Kontext = Map). Jedes Audiopaket traegt die
- *     eigene Position; empfangene Stimmen werden nach Entfernung und Richtung
- *     gemischt. Logout -> trennen und Mikrofon freigeben. Verbindungsabbruch
- *     -> Reconnect mit Backoff (2 s .. 30 s).
- * EN: Flow: enter world -> open microphone/speakers -> connect to Murmur
- *     (name = character, context = map). Every audio packet carries the own
- *     position; received voices are mixed by distance and direction.
- *     Logout -> disconnect and release the microphone. Connection lost ->
- *     reconnect with backoff (2 s .. 30 s).
+ * DE: Ablauf (Mode=auto/server):
+ *     Welt betreten -> HELLO an den Worldserver -> CONFIG (Murmur-Adresse, Name, Nonce)
+ *     -> mit Murmur verbinden -> "MVC1-BIND <nonce>" an den Bot -> BOUND. Danach:
+ *     CONTEXT (Map/Instanz) und NEARBY (nahe Fremde + Gruppe) vom Server.
+ *     Abspielen: Gruppe/Raid immer voll (Position nur fuer die Richtung), Fremde nach
+ *     Entfernung, alle anderen stumm. Senden: Whisper an Nah + Gruppe.
+ *     Antwortet der Server nicht (Mode=auto), laeuft alles eigenstaendig wie in Phase 4.
+ * EN: Flow (Mode=auto/server):
+ *     enter world -> HELLO to the worldserver -> CONFIG (Murmur address, name, nonce)
+ *     -> connect to Murmur -> "MVC1-BIND <nonce>" to the bot -> BOUND. Then:
+ *     CONTEXT (map/instance) and NEARBY (nearby strangers + group) from the server.
+ *     Playback: party/raid always full (position only for direction), strangers by
+ *     distance, everyone else silent. Sending: whisper to near + group.
+ *     If the server does not answer (Mode=auto), everything runs standalone as in phase 4.
  */
 #include "VoiceApp.h"
 
+#include <algorithm>
 #include <cmath>
 
 using namespace voicecore;
@@ -24,6 +29,10 @@ namespace voice
     namespace
     {
         constexpr unsigned long long TICK_STALE_MS = 5000;   // Hauptthread haengt (Ladebildschirm) / main thread stalled
+        constexpr int AUTO_HELLO_TRIES = 3;                  // danach Fallback / then fallback (Mode=auto)
+        constexpr unsigned HELLO_INTERVAL_MS = 5000;
+        constexpr unsigned BIND_INTERVAL_MS = 3000;
+        constexpr int BIND_TRIES = 5;
     }
 
     void VoiceApp::Run()
@@ -31,7 +40,8 @@ namespace voice
         std::string ini = Config::ModuleDir() + "\\voice.ini";
         bool haveIni = _cfg.Load(ini);
         SetLogEnabled(_cfg.log);
-        Log("mod-voicechat voice.dll started (phase 4), ini " + std::string(haveIni ? "loaded" : "missing -> defaults"));
+        Log("mod-voicechat voice.dll started (phase 5), ini " + std::string(haveIni ? "loaded" : "missing -> defaults") +
+            ", mode " + _cfg.serverMode);
 
         _spatial.minDistance = _cfg.minDistance;
         _spatial.maxDistance = _cfg.maxDistance;
@@ -46,6 +56,8 @@ namespace voice
 
         // DE: Verkabelung Audio <-> Netz. EN: wiring audio <-> network.
         _tx.onPacket = [this](const uint8_t* p, size_t n, bool term) {
+            int target = _sendTarget;
+            if (target < 0) return;
             float pos[3];
             bool has;
             {
@@ -53,7 +65,7 @@ namespace voice
                 has = _hasMyPos;
                 pos[0] = _myPos[0]; pos[1] = _myPos[1]; pos[2] = _myPos[2];
             }
-            _client.SendAudio(p, n, term, has ? pos : nullptr);
+            _client.SendAudio(p, n, term, has ? pos : nullptr, uint32_t(target));
         };
         _audio.onCapture = [this](const float* mono, size_t frames) { _tx.PushPcm(mono, frames); };
         _audio.onPlayback = [this](float* stereo, size_t frames) {
@@ -69,6 +81,8 @@ namespace voice
         };
         _client.onLog = [](const std::string& m) { Log("mumble: " + m); };
         _client.onDisconnected = [this](const std::string& r) { Log("mumble disconnected: " + r); _lost = true; };
+        // DE: MVCP-Pakete im Hauptthread senden/empfangen. EN: send/receive MVCP packets on the main thread.
+        _game.onTick = [this](const GameSnapshot& s) { _server.MainTick(s.inWorld); };
 
         unsigned long long lastAttachTry = 0;
         while (!_stop)
@@ -81,8 +95,9 @@ namespace voice
             bool fresh = s.tickMs != 0 && now - s.tickMs < TICK_STALE_MS;
             // DE: Waehrend Ladebildschirmen (kein Tick) den Zustand beibehalten.
             // EN: keep the state during loading screens (no tick).
-            bool inWorld = _cfg.autoConnectInWorld ? (fresh ? s.inWorld : _active) : true;
-            std::string name = !_cfg.username.empty() ? _cfg.username : (fresh ? s.name : _currentName);
+            bool inWorld = fresh ? s.inWorld : _inWorld;
+            if (!_cfg.autoConnectInWorld && _cfg.serverMode == "standalone") inWorld = true;
+            std::string charName = fresh && s.inWorld ? s.name : _charName;
 
             if (fresh && s.inWorld)
             {
@@ -103,27 +118,37 @@ namespace voice
                 _hasMyPos = true;
             }
 
-            if (_active && (!inWorld || name != _currentName))
-                Disconnect(inWorld ? "character changed" : "left world");
-
-            if (_active && _lost)
+            // DE: Welt betreten/verlassen oder Charakterwechsel. EN: world enter/leave or character change.
+            if (inWorld != _inWorld || (inWorld && !charName.empty() && charName != _charName))
             {
-                _client.Stop();
-                _active = false;
-                _nextRetry = now + _retryDelayMs;
-                _retryDelayMs = _retryDelayMs * 2 > 30000 ? 30000 : _retryDelayMs * 2;
+                Disconnect(inWorld ? "character changed" : "left world");
+                _inWorld = inWorld;
+                _charName = charName;
+                ResetLink(now);
             }
 
-            if (!_active && inWorld && !name.empty() && now >= _nextRetry)
-                Connect(name);
+            std::vector<uint8_t> m;
+            while (_server.Poll(m))
+                HandleMvcp(m, now);
+
+            if (_inWorld)
+            {
+                switch (_link)
+                {
+                    case Link::Hello:      StepHello(now); break;
+                    case Link::Configured: StepServer(now); break;
+                    case Link::Standalone: StepStandalone(now, s, fresh); break;
+                    case Link::Disabled:
+                        if (_nextHello && now >= _nextHello) { _link = Link::Hello; _helloTries = 0; }
+                        break;
+                    case Link::Off: break;
+                }
+            }
 
             if (_active && _client.State() == ClientState::Connected)
             {
-                _retryDelayMs = 2000;
-                if (fresh && s.inWorld) UpdateContext(s);
-                bool fg = _game.Get().tickMs != 0;   // Fenster existiert / window exists
                 HWND w = wow::MainWindow();
-                bool foreground = fg && w && GetForegroundWindow() == w;
+                bool foreground = _game.Get().tickMs != 0 && w && GetForegroundWindow() == w;
                 _tx.SetPushToTalk(foreground && (GetAsyncKeyState(_cfg.pushToTalkKey) & 0x8000) != 0);
             }
             else
@@ -134,12 +159,218 @@ namespace voice
         Disconnect("shutdown");
     }
 
+    // ------------------------------------------------------------------------------------------
+    //  Server-Link (MVCP)
+    // ------------------------------------------------------------------------------------------
+    void VoiceApp::ResetLink(unsigned long long now)
+    {
+        _server.ClearOutgoing();
+        _helloTries = 0;
+        _helloBackoffMs = 2000;
+        _nextHello = now + 1000;   // DE: kurz nach dem Betreten. EN: shortly after entering.
+        if (!_inWorld) _link = Link::Off;
+        else _link = _cfg.serverMode == "standalone" ? Link::Standalone : Link::Hello;
+    }
+
+    void VoiceApp::StepHello(unsigned long long now)
+    {
+        if (now < _nextHello) return;
+        if (_cfg.serverMode == "auto" && _helloTries >= AUTO_HELLO_TRIES)
+        {
+            Log("no answer from mod-voicechat on the worldserver -> standalone (voice.ini [Server])");
+            _link = Link::Standalone;
+            return;
+        }
+        VoiceProto::Hello h;
+        _server.Send(VoiceProto::Encode(h));
+        ++_helloTries;
+        _nextHello = now + (_helloTries < AUTO_HELLO_TRIES ? HELLO_INTERVAL_MS : 30000);
+    }
+
+    void VoiceApp::HandleMvcp(const std::vector<uint8_t>& m, unsigned long long now)
+    {
+        VoiceProto::Msg type;
+        const uint8_t* body = nullptr;
+        size_t n = 0;
+        if (!VoiceProto::Unwrap(m.data(), m.size(), type, body, n) || !_inWorld)
+            return;
+
+        switch (type)
+        {
+            case VoiceProto::Msg::Config:
+            {
+                VoiceProto::Config c;
+                if (!VoiceProto::Decode(body, n, c) || c.host.empty() || c.nonce.empty()) return;
+                if (_link == Link::Standalone)
+                    Disconnect("server integration available");
+                bool same = _active && _link == Link::Configured && c.host == _srv.host && c.port == _srv.port &&
+                            c.username == _srv.username;
+                // DE: Schon verbunden (z. B. Bot-Reconnect) -> nur neu binden. EN: already connected (e.g. bot reconnect) -> just re-bind.
+                if (!same)
+                {
+                    Disconnect("new server config");
+                    _nextRetry = 0;
+                }
+                _srv = c;
+                _srvContext = c.context;
+                {
+                    std::lock_guard<std::mutex> g(_posMutex);
+                    _spatial.minDistance = c.minDistance;
+                    _spatial.maxDistance = c.maxDistance;
+                }
+                _link = Link::Configured;
+                _bound = false;
+                _bindTries = 0;
+                _nextBind = now;
+                Log("server config: " + c.host + ":" + std::to_string(c.port) + " as '" + c.username + "'");
+                break;
+            }
+            case VoiceProto::Msg::Context:
+            {
+                VoiceProto::Context c;
+                if (VoiceProto::Decode(body, n, c)) _srvContext = c.context;
+                break;
+            }
+            case VoiceProto::Msg::Nearby:
+            {
+                VoiceProto::Nearby l;
+                if (!VoiceProto::Decode(body, n, l)) return;
+                std::set<uint32_t> nearby(l.sessions.begin(), l.sessions.end()), group(l.group.begin(), l.group.end());
+                _target.clear();
+                std::set_union(nearby.begin(), nearby.end(), group.begin(), group.end(), std::back_inserter(_target));
+                std::lock_guard<std::mutex> g(_posMutex);
+                _nearby.swap(nearby);
+                _group.swap(group);
+                _serverLists = true;
+                break;
+            }
+            case VoiceProto::Msg::Bound:
+                _bound = true;
+                _retryDelayMs = 2000;
+                _helloBackoffMs = 2000;
+                Log("bound to the character");
+                break;
+            case VoiceProto::Msg::Disabled:
+            {
+                VoiceProto::Disabled d;
+                VoiceProto::Decode(body, n, d);
+                Log("voice disabled by the server: " + d.reason);
+                Disconnect("disabled by the server");
+                _link = Link::Disabled;
+                // DE: "unavailable" = Murmur weg -> spaeter erneut; sonst erst nach neuem Betreten der Welt.
+                // EN: "unavailable" = Murmur gone -> retry later; otherwise only after re-entering the world.
+                _nextHello = d.reason == "unavailable" ? now + 30000 : 0;
+                break;
+            }
+            default:
+                break;
+        }
+    }
+
+    void VoiceApp::StepServer(unsigned long long now)
+    {
+        if (_active && _lost)
+        {
+            // DE: Neue Verbindung braucht eine neue Nonce -> wieder HELLO (mit Backoff).
+            // EN: a new connection needs a new nonce -> HELLO again (with backoff).
+            Disconnect("connection lost");
+            _link = Link::Hello;
+            _helloTries = 0;
+            _nextHello = now + _helloBackoffMs;
+            _helloBackoffMs = std::min(_helloBackoffMs * 2, 30000u);
+            return;
+        }
+        if (!_active)
+        {
+            if (now < _nextRetry) return;
+            ClientConfig cc;
+            cc.host = _srv.host;
+            cc.port = uint16_t(_srv.port);
+            cc.username = _srv.username;
+            cc.password = _srv.password;
+            cc.certPinSha256 = !_srv.certPin.empty() ? _srv.certPin : _cfg.certSha256;
+            cc.forceTcp = _cfg.forceTcp;
+            Connect(cc);
+            return;
+        }
+        if (_client.State() != ClientState::Connected) return;
+
+        if (_srvContext != _context)
+        {
+            _context = _srvContext;
+            _client.SetPluginContext(_context, _charName);
+            Log("context " + _context);
+        }
+
+        if (!_bound && now >= _nextBind)
+        {
+            if (_bindTries >= BIND_TRIES)
+            {
+                Log("binding failed -> asking the server again");
+                Disconnect("binding failed");
+                _link = Link::Hello;
+                _helloTries = 0;
+                _nextHello = now + _helloBackoffMs;
+                _helloBackoffMs = std::min(_helloBackoffMs * 2, 30000u);
+                return;
+            }
+            uint32_t bot = 0;
+            for (auto& u : _client.Users())
+                if (u.name == _srv.botName) bot = u.session;
+            if (bot)
+            {
+                MumbleProto::TextMessage t;
+                t.sessions.push_back(bot);
+                t.message = VoiceProto::BindText(_srv.nonce);
+                _client.SendTcp(MumbleProto::Tcp::TextMessage, t.Encode());
+            }
+            ++_bindTries;
+            _nextBind = now + BIND_INTERVAL_MS;
+        }
+
+        // DE: Whisper-Ziel = nahe Fremde + Gruppe. EN: whisper target = nearby strangers + group.
+        if (_bound && (!_targetValid || _target != _targetSent))
+        {
+            _client.SendTcp(MumbleProto::Tcp::VoiceTarget, MumbleProto::EncodeVoiceTargetSessions(1, _target));
+            _targetSent = _target;
+            _targetValid = true;
+        }
+        _sendTarget = _bound && _targetValid && !_target.empty() ? 1 : -1;
+    }
+
+    void VoiceApp::StepStandalone(unsigned long long now, const GameSnapshot& s, bool fresh)
+    {
+        std::string name = !_cfg.username.empty() ? _cfg.username : _charName;
+        if (_active && _lost)
+        {
+            _client.Stop();
+            _active = false;
+            _nextRetry = now + _retryDelayMs;
+            _retryDelayMs = std::min(_retryDelayMs * 2, 30000u);
+        }
+        if (!_active && !name.empty() && now >= _nextRetry)
+        {
+            ClientConfig cc;
+            cc.host = _cfg.host;
+            cc.port = _cfg.port;
+            cc.username = name;
+            cc.password = _cfg.password;
+            cc.certPinSha256 = _cfg.certSha256;
+            cc.forceTcp = _cfg.forceTcp;
+            Connect(cc);
+        }
+        if (_active && _client.State() == ClientState::Connected)
+        {
+            _retryDelayMs = 2000;
+            _sendTarget = 0;
+            if (fresh && s.inWorld) UpdateContext(s);
+        }
+    }
+
     void VoiceApp::UpdateContext(const GameSnapshot& s)
     {
         // DE: Murmur leitet Positionen nur zwischen gleichem Kontext weiter -> Map-Trennung.
-        //     (Ab Phase 5 gibt der Server den Kontext inkl. Instanz vor.)
         // EN: Murmur only forwards positions between equal contexts -> map isolation.
-        //     (From phase 5 on the server dictates the context incl. instance.)
         std::string ctx = "wow335|" + std::to_string(s.mapId);
         if (ctx == _context) return;
         _context = ctx;
@@ -147,55 +378,75 @@ namespace voice
         Log("context " + ctx);
     }
 
+    // ------------------------------------------------------------------------------------------
+    //  Audio
+    // ------------------------------------------------------------------------------------------
     SpeakerGain VoiceApp::GainFor(uint32_t session)
     {
         std::lock_guard<std::mutex> g(_posMutex);
+        SpeakerGain silent;
+        silent.left = silent.right = 0.0f;
         auto it = _speakerPos.find(session);
+
+        if (_serverLists)
+        {
+            // DE: Gruppe/Raid: nie leiser, Position nur fuer die Richtung (andere Map -> mittig).
+            // EN: party/raid: never quieter, position only for direction (other map -> centred).
+            if (_group.count(session))
+            {
+                if (it == _speakerPos.end()) return SpeakerGain();
+                spatial::Params p = _spatial;
+                p.directionOnly = true;
+                return spatial::Compute(_listener, it->second, p);
+            }
+            // DE: Nur vom Server gemeldete Fremde sind hoerbar. EN: only strangers reported by the server are audible.
+            if (!_nearby.count(session)) return silent;
+        }
         if (it == _speakerPos.end())
         {
             // DE: Ohne Position (andere Map/kein WoW-Client) standardmaessig stumm.
             // EN: without position (other map/not a WoW client) silent by default.
-            SpeakerGain z;
-            if (!_cfg.hearWithoutPosition) z.left = z.right = 0.0f;
-            return z;
+            return _cfg.hearWithoutPosition ? SpeakerGain() : silent;
         }
         return spatial::Compute(_listener, it->second, _spatial);
     }
 
-    void VoiceApp::Connect(const std::string& name)
+    void VoiceApp::Connect(const ClientConfig& cc)
     {
         if (!_audio.Running() && !_audio.Start(_cfg.inputDevice, _cfg.outputDevice))
             Log("audio start failed");
-        ClientConfig cc;
-        cc.host = _cfg.host;
-        cc.port = _cfg.port;
-        cc.username = name;
-        cc.password = _cfg.password;
-        cc.certPinSha256 = _cfg.certSha256;
-        cc.forceTcp = _cfg.forceTcp;
         _lost = false;
         _context.clear();
+        _targetValid = false;
+        _sendTarget = -1;
         _client.Start(cc);
         _active = true;
-        _currentName = name;
-        Log("connecting as '" + name + "'");
+        Log("connecting to " + cc.host + ":" + std::to_string(cc.port) + " as '" + cc.username + "'");
     }
 
     void VoiceApp::Disconnect(const char* why)
     {
+        _sendTarget = -1;
+        _bound = false;
+        _targetValid = false;
+        {
+            std::lock_guard<std::mutex> g(_posMutex);
+            _speakerPos.clear();
+            _nearby.clear();
+            _group.clear();
+            _serverLists = false;
+            _spatial.minDistance = _cfg.minDistance;
+            _spatial.maxDistance = _cfg.maxDistance;
+        }
+        _target.clear();
         if (!_active) return;
         Log(std::string("disconnect: ") + why);
         _tx.SetPushToTalk(false);
         _client.Stop();
         _audio.Stop();            // Mikrofon freigeben / release microphone
         _mixer.Clear();
-        {
-            std::lock_guard<std::mutex> g(_posMutex);
-            _speakerPos.clear();
-        }
         _active = false;
         _lost = false;
-        _currentName.clear();
         _context.clear();
         _retryDelayMs = 2000;
         _nextRetry = 0;

@@ -1,10 +1,17 @@
 ; ============================================================
 ;  mod-voicechat - voice.ini (neben Wow.exe / next to Wow.exe)
-;  Phase 4: Positional Voice (Entfernung + Richtung, Trennung nach Map) / distance + direction, map isolation
+;  Phase 5: Server-Integration (mod-voicechat) / server integration
 ; ============================================================
 
 [Server]
-; DE: Murmur-Server. EN: Murmur server.
+; DE: auto       = Worldserver fragen (mod-voicechat); antwortet er nicht, eigenstaendig mit Host/Port unten
+;     server     = nur ueber den Worldserver (Adresse, Name, Channel, Rechte kommen vom Server)
+;     standalone = ohne Worldserver, direkt Host/Port unten (Test/Phase 4)
+; EN: auto       = ask the worldserver (mod-voicechat); if it does not answer, standalone with Host/Port below
+;     server     = only via the worldserver (address, name, channel, permissions come from the server)
+;     standalone = without worldserver, directly Host/Port below (test/phase 4)
+Mode=auto
+; DE: Murmur-Server (nur standalone/Fallback). EN: Murmur server (standalone/fallback only).
 Host=127.0.0.1
 Port=64738
 Password=

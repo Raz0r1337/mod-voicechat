@@ -14,28 +14,39 @@
 | `tests/e2e.sh` | end-to-end test against a real Murmur |
 | `loader/` | exe patch that makes Wow.exe load `voice.dll` (file size unchanged) |
 
-The shared protocol code (`src/shared/MumbleProtocol.h`) will also be used by the AzerothCore module later.
+The shared protocol code (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtocol.h`) is used by both `voice.dll` and the AzerothCore module.
 
-## Phase 4 status
+## Phase 5 status
 
 **What works:**
-- microphone → Opus → Murmur → other clients → speakers
-- **Positional voice:** every voice packet carries the speaker's position. The listener mixes by distance (full volume up to `MinDistance`, silent from `MaxDistance`) and direction, with stereo panning and a duller sound from behind.
-- **Map isolation:** the Mumble context is `wow335|<map id>`. Murmur only forwards positions within the same map; speakers without a position are silent.
-- **Connect and disconnect:** connect when entering the world (name = character name), disconnect on logout, reconnect with backoff.
-- **No code patch for the main thread:** game data is read on the WoW main thread. For that the WoW window is subclassed; no code patch is needed.
+- **Transmission:** microphone → Opus → Murmur → other clients → speakers.
+- **Positional voice:** every voice packet carries the speaker's position. The listener mixes by distance (full up to `MinDistance`, silent from `MaxDistance`) and direction, with stereo panning and a duller sound from behind.
+- **Server integration (`[Server] Mode=auto`):**
+  - On entering the world, `voice.dll` asks the worldserver over the WoW connection.
+  - If the server runs `mod-voicechat`, the Murmur address, name, channel (map/instance) and permissions come from there.
+  - The Mumble session is bound to the character via a one-time nonce.
+  - Without an answer (server without the module), everything runs standalone as in phase 4.
+- **Party/raid:** members are always fully audible, even on other maps or in instances. Their position only sets the direction: never quieter, no rear damping, later no occlusion. Members on another map sound centred.
+- **Strangers:** they are only audible when the server reports them as "in range", and they get quieter with distance.
+- **Sending:** audio only goes to "near + group" (Mumble whisper). This saves bandwidth, and a manipulated client cannot force audio on anyone.
+- **No code patch:** game data and packets are processed on the WoW main thread (subclassed WoW window). For the server packets, only a handler is put into WoW's handler table; other packets go to the original handler.
 
 **Deliberately not included yet:**
-- **No instance isolation and no permissions:** this comes with the AzerothCore integration (phase 5), as does limiting audio to nearby players (bandwidth).
 - **No walls/occlusion** (phase 6).
-- **Own PTT key:** the key is set in `voice.ini`; the WoW key binding is not used yet (phase 7).
-- **Addresses only checked statically:** all client addresses live in `voice/WowApi.h`. They are **checked statically** against the original 12340 exe, but **not at runtime** yet.
+- **Own PTT key:** the key is set in `voice.ini`; WoW key bindings and the Blizzard voice UI follow in phase 7.
+- **Addresses only checked statically:** all client addresses are in `voice/WowApi.h`. They were **checked statically** against the original 12340 exe (disassembly: handler table `conn+0x53C`, call `cdecl(param, opcode, time, CDataStore*)`), but **not at runtime** yet.
 
 **Tested here:**
-- **Transport:** voicecli → Murmur 1.5.517 → voicecli over UDP and over the TCP tunnel: 200/200 packets, 199 clean 440 Hz frames.
-- **Positions through Murmur:** a speaker at 5 yd is audible. At 100 yd they are silent although packets arrive. On another map they are silent because Murmur strips the position.
-- **Unit tests:** distance, panning, rotation, behind/front, occlusion formula, coordinates and click-free volume ramps.
-- `voice.dll` builds cleanly as a 32-bit DLL and imports only system DLLs.
+- **Transmission:** voicecli → Murmur 1.5.517 → voicecli over UDP and over the TCP tunnel: 200/200 packets, 199 clean 440 Hz frames.
+- **Positions through Murmur:** a speaker at 5 yd is audible. At 100 yd it is silent even though packets arrive. On another map it is silent because Murmur strips the position.
+- **Bot + Murmur** (`external/module-tests`):
+  - Binding via nonce works.
+  - Players end up in the right channel.
+  - Different channels do not hear each other.
+  - Unbound users are kicked.
+  - Whispering across channel borders (group) arrives.
+- **Unit tests:** distance, panning, rotation, behind/front, occlusion formula, group mode (never quieter), coordinates and click-free volume ramps.
+- **Builds:** `voice.dll` builds cleanly as a 32-bit DLL, and the AzerothCore module compiles without warnings.
 - **Nothing has been tested inside WoW itself.**
 
 ## Getting voice.dll
@@ -55,20 +66,31 @@ The shared protocol code (`src/shared/MumbleProtocol.h`) will also be used by th
 ## Installing into a test client
 
 1. Patch Wow.exe with the loader, see [`loader/README.en.md`](loader/README.en.md).
-2. Put `voice.dll` and `voice.ini` (a copy of `voice/voice.ini.example`) next to `Wow.exe`.
-3. Enter the Murmur server in `voice.ini`.
+2. Put `voice.dll` next to `Wow.exe`. `voice.ini` (a copy of `voice/voice.ini.example`) is optional.
+3. **With the AzerothCore module:** nothing else is needed, `Mode=auto` fetches everything from the server (setup: see the main README).
+   **Without the module:** set `Mode=standalone` and the Murmur server under `[Server]` in `voice.ini`.
 4. Murmur needs `opusthreshold=0` so that Opus is active right away. This is the default in current versions.
 5. Start WoW, log in and hold the push-to-talk key (default: CAPSLOCK).
 
-## Test checklist (please report back `voice.log`)
+## Test checklist (please report back `voice.log` and the worldserver log)
 
 - [ ] Does WoW start normally, with and without `voice.dll`?
-- [ ] Does `voice.log` contain `voice.dll started`?
-- [ ] When entering the world, do you see `connecting as '<character name>'` and then `connected, session N`? If not, set `AutoConnectInWorld=0` and `Username=Test` for testing and send `voice.log` (then an address in `WowApi.h` is off).
-- [ ] Does the log contain `UDP active`?
-- [ ] Can two clients hear each other? Does it get quieter when walking away, silent at about 40 yd? Does the voice come from the right side?
-- [ ] Does the log show `context wow335|<map>` when entering another map?
-- [ ] Does logging out disconnect (`disconnect: left world`) and release the microphone?
-- [ ] Does the client reconnect when Murmur restarts?
+- [ ] Is `voice.dll started (phase 5)` in `voice.log`?
+- [ ] After entering the world, is `ServerLink: SMSG handler installed` in the log?
+- [ ] **With the module:** do these lines appear in the log, in order?
+  - [ ] `server config: <host>:<port> as '<name>'`
+  - [ ] `connected, session N`
+  - [ ] `bound to the character`
+  - [ ] `context wow335|<realm>|<map>|<instance>`
 
-With `voicecli.exe --host <server> --user Test --send-tone 440 --seconds 10` you hear a test tone in game without needing a second WoW.
+  The worldserver log should show `<name> bound to Mumble session N`.
+- [ ] **Without the module** (`Mode=auto`): after about 15 s, does `no answer from mod-voicechat ... -> standalone` appear, and does the client then connect using `voice.ini`?
+- [ ] Is `UDP active` in the log?
+- [ ] **Strangers:** do two clients (not grouped) hear each other? Does the voice get quieter when walking away, and is it silent from about 40 yd? Does the voice come from the right side?
+- [ ] **Group:** is a group member still fully audible at 200 yd and from the right direction? Can you also hear them when they are in an instance or on another continent?
+- [ ] Does the context change when entering an instance, and do players in different instances of the same dungeon ID not hear each other (unless in the same group)?
+- [ ] Do `.voice status`, `.voice mute <name>`, `.voice unmute <name>` and `.voice kick <name>` work?
+- [ ] On logout, is the connection closed (`disconnect: left world`) and the microphone released?
+- [ ] Does the client reconnect when Murmur or the worldserver restarts?
+
+With `voicecli.exe --host <server> --user Test --send-tone 440 --seconds 10` you hear a test tone in the game without needing a second WoW. This only works in standalone mode, because with the module the client only plays voices the server reports.

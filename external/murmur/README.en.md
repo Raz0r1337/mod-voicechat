@@ -22,7 +22,7 @@ sudo systemctl status mumble-server
 
 - **Configuration:** `/etc/mumble/mumble-server.ini` (older packages up to Mumble 1.4: `/etc/mumble-server.ini`)
 - **Log:** `sudo journalctl -u mumble-server -f`
-- **SuperUser password** (only needed from phase 5 on, for the bot): `sudo mumble-server -ini /etc/mumble/mumble-server.ini -supw <password>`
+- **SuperUser password** (required for the module, the bot logs in with it): `sudo mumble-server -ini /etc/mumble/mumble-server.ini -supw <password>`
 
 ## Variant B: Docker
 
@@ -51,6 +51,17 @@ voicecli.exe --host <server-ip> --user Sender --send-tone 440 --seconds 4
 
 The listener must report `PASS`, and its output should show `udp=yes`.
 
-## What comes later
+## Channels and ACLs (phase 5, automatic)
 
-- **From phase 5 on:** channel structure and ACLs so that everyone only hears their own map or instance, plus a bot account for AzerothCore. The template and setup script will follow here.
+You do not have to create anything in Murmur by hand. The module's bot logs in as `SuperUser` and creates everything itself:
+
+- `WoW/` with this ACL:
+  - Nobody may enter channels on their own, speak, write text, listen in (Listen) or create channels.
+  - Speaking is only allowed in the own channel (group `in`).
+  - Whispering is allowed so that group members hear each other across maps. The worldserver decides which voices a client plays.
+- `WoW/Lobby`: the bot sits here, and clients may write it the binding nonce here.
+- `WoW/<realm>/Map-<id>[/Inst-<id>]`: these channels are created on demand. The bot deletes empty channels after `Voice.Bot.EmptyChannelTimeout` seconds.
+
+Mumble users without a binding to a character are kicked after `Voice.BindTimeoutSeconds`. Put exceptions (e.g. admins with a regular Mumble client) into `Voice.AllowedExternalUsers`.
+
+**Rate limits:** Murmur silently drops channel, ACL and text messages that come too fast (`messagelimit`/`messageburst`). The bot therefore throttles itself (`Voice.Bot.MessageRate`/`MessageBurst`). If you set the Murmur values lower than the defaults, lower the bot values as well.

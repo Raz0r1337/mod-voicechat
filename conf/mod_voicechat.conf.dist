@@ -1,0 +1,203 @@
+#
+# mod-voicechat - native positional voice chat (Murmur backend)
+# SPDX-License-Identifier: GPL-2.0-or-later
+#
+# DE: WARNUNG: Sehr fruehes, ungetestetes Stadium - nicht zum Spielen freigegeben.
+# EN: WARNING: very early, untested stage - not released for playing.
+#
+# DE: Diese Datei nach mod_voicechat.conf kopieren (passiert beim "make install"
+#     automatisch als .dist) und anpassen.
+# EN: Copy this file to mod_voicechat.conf (it is installed as .dist by
+#     "make install") and adjust it.
+#
+
+[worldserver]
+
+###################################################################################################
+# ALLGEMEIN / GENERAL
+#
+#    Voice.Enable
+#        DE: Voice-Chat einschalten.
+#        EN: Enable voice chat.
+#        Default: 0
+
+Voice.Enable = 0
+
+#    Voice.PublicHost / Voice.PublicPort
+#        DE: Adresse von Murmur, wie sie die Spieler erreichen (wird an voice.dll geschickt).
+#        EN: Murmur address as reachable by players (sent to voice.dll).
+#        Default: "127.0.0.1" / 64738
+
+Voice.PublicHost = "127.0.0.1"
+Voice.PublicPort = 64738
+
+#    Voice.ServerPassword
+#        DE: "serverpassword" aus mumble-server.ini (leer = keins).
+#        EN: "serverpassword" from mumble-server.ini (empty = none).
+#        Default: ""
+
+Voice.ServerPassword = ""
+
+#    Voice.CertSha256
+#        DE: Optional: SHA-256 des Murmur-Zertifikats (Hex). voice.dll und Bot pruefen es dann (Pinning).
+#            Ermitteln: openssl x509 -in cert.pem -noout -fingerprint -sha256
+#        EN: Optional: SHA-256 of the Murmur certificate (hex). voice.dll and the bot then verify it (pinning).
+#            Obtain: openssl x509 -in cert.pem -noout -fingerprint -sha256
+#        Default: ""
+
+Voice.CertSha256 = ""
+
+###################################################################################################
+# BOT (Steuerverbindung zu Murmur / control connection to Murmur)
+#
+#    Voice.Bot.Host / Voice.Bot.Port
+#        DE: Adresse von Murmur aus Sicht des Worldservers.
+#        EN: Murmur address as seen from the worldserver.
+#        Default: "127.0.0.1" / 64738
+
+Voice.Bot.Host = "127.0.0.1"
+Voice.Bot.Port = 64738
+
+#    Voice.Bot.Username / Voice.Bot.Password
+#        DE: SuperUser von Murmur. Passwort setzen: mumble-server -ini /etc/mumble/mumble-server.ini -supw <pw>
+#            Ohne Passwort bleibt Voice deaktiviert.
+#        EN: Murmur's SuperUser. Set the password: mumble-server -ini /etc/mumble/mumble-server.ini -supw <pw>
+#            Without a password voice stays disabled.
+#        Default: "SuperUser" / ""
+
+Voice.Bot.Username = "SuperUser"
+Voice.Bot.Password = ""
+
+#    Voice.Bot.CertSha256
+#        DE: Zertifikats-Pin fuer den Bot (Standard: Voice.CertSha256).
+#        EN: certificate pin for the bot (default: Voice.CertSha256).
+
+# Voice.Bot.CertSha256 = ""
+
+#    Voice.Bot.RootChannel / Voice.Bot.LobbyChannel
+#        DE: Oberster Channel fuer WoW und Channel, in dem der Bot sitzt.
+#        EN: top channel for WoW and the channel the bot sits in.
+#        Default: "WoW" / "Lobby"
+
+Voice.Bot.RootChannel = "WoW"
+Voice.Bot.LobbyChannel = "Lobby"
+
+#    Voice.Bot.EmptyChannelTimeout
+#        DE: Leere Map-/Instanz-Channels nach so vielen Sekunden loeschen.
+#        EN: delete empty map/instance channels after this many seconds.
+#        Default: 120
+
+Voice.Bot.EmptyChannelTimeout = 120
+
+#    Voice.Bot.MessageRate / Voice.Bot.MessageBurst
+#        DE: Eigene Drosselung unter Murmurs messagelimit/messageburst (Murmur verwirft sonst still).
+#        EN: own throttling below Murmur's messagelimit/messageburst (Murmur silently drops otherwise).
+#        Default: 0.9 / 4
+
+Voice.Bot.MessageRate = 0.9
+Voice.Bot.MessageBurst = 4
+
+#    Voice.Bot.Verbose
+#        Default: 0
+
+Voice.Bot.Verbose = 0
+
+###################################################################################################
+# CHANNELS + NAMEN / CHANNELS + NAMES
+#
+#    Voice.RealmName
+#        DE: Channel unter RootChannel; Teil des Positions-Kontexts. Nur Buchstaben/Ziffern/-_ verwenden.
+#        EN: channel below RootChannel; part of the positional context. Use letters/digits/-_ only.
+#        Default: "Realm"
+
+Voice.RealmName = "Realm"
+
+#    Voice.AppendRealmToName
+#        DE: Mumble-Name = "Charakter@Realm" (fuer mehrere Realms auf einem Murmur).
+#        EN: Mumble name = "Character@Realm" (for several realms on one Murmur).
+#        Default: 0
+
+Voice.AppendRealmToName = 0
+
+#    Voice.CrossFaction
+#        DE: 1 = Allianz und Horde hoeren sich. 0 = getrennte Channels je Fraktion.
+#        EN: 1 = Alliance and Horde hear each other. 0 = separate channels per faction.
+#        Default: 1
+
+Voice.CrossFaction = 1
+
+###################################################################################################
+# REICHWEITE / RANGE
+#
+#    Voice.MinDistance / Voice.MaxDistance
+#        DE: Volle Lautstaerke bis MinDistance, stumm ab MaxDistance (Yards). Wird an voice.dll geschickt.
+#        EN: full volume up to MinDistance, silent from MaxDistance (yards). Sent to voice.dll.
+#        Default: 3 / 40
+
+Voice.MinDistance = 3
+Voice.MaxDistance = 40
+
+#    Voice.ServerCulling
+#        DE: 1 = Der Server schickt jedem Client nur die Fremden in Hoerweite (MaxDistance); der Client
+#            fluestert nur ihnen (+ Gruppe). Spart Bandbreite. 0 = alle auf derselben Map/Instanz
+#            bekommen die Stimme (der Client daempft trotzdem nach Entfernung).
+#        EN: 1 = the server only sends each client the strangers within range (MaxDistance); the client
+#            only whispers to them (+ group). Saves bandwidth. 0 = everyone on the same map/instance
+#            receives the voice (the client still attenuates by distance).
+#        Default: 1
+
+Voice.ServerCulling = 1
+
+#    Voice.NearbyIntervalMs
+#        DE: Wie oft die Nah-Liste berechnet wird (min. 200).
+#        EN: how often the nearby list is computed (min. 200).
+#        Default: 1000
+
+Voice.NearbyIntervalMs = 1000
+
+###################################################################################################
+# RECHTE + SICHERHEIT / PERMISSIONS + SECURITY
+#
+#    Voice.MinSecurity
+#        DE: Minimales GM-Level fuer Voice (0 = alle Spieler).
+#        EN: minimum GM level for voice (0 = all players).
+#        Default: 0
+
+Voice.MinSecurity = 0
+
+#    Voice.MuteChatMuted
+#        DE: Im Chat stummgeschaltete Spieler (.mute) sind auch im Voice stumm.
+#        EN: players muted in chat (.mute) are also muted in voice.
+#        Default: 1
+
+Voice.MuteChatMuted = 1
+
+#    Voice.BindTimeoutSeconds
+#        DE: Mumble-Nutzer ohne gueltige Bindung an einen Charakter werden danach gekickt.
+#        EN: Mumble users without a valid binding to a character are kicked after this.
+#        Default: 30
+
+Voice.BindTimeoutSeconds = 30
+
+#    Voice.NonceTtlSeconds
+#        DE: Gueltigkeit der Einmal-Nonce.
+#        EN: validity of the one-time nonce.
+#        Default: 60
+
+Voice.NonceTtlSeconds = 60
+
+#    Voice.AllowedExternalUsers
+#        DE: Kommagetrennte Mumble-Namen, die ohne Bindung bleiben duerfen (z. B. Admins mit normalem Mumble).
+#        EN: comma separated Mumble names allowed to stay without binding (e.g. admins using regular Mumble).
+#        Default: ""
+
+Voice.AllowedExternalUsers = ""
+
+#    Voice.GroupAlwaysAudible
+#        DE: 1 = Gruppen-/Raidmitglieder sind immer voll hoerbar (auch auf anderen Maps/in Instanzen);
+#            ihre Position bestimmt nur die Richtung, nie die Lautstaerke. Fremde nur in Hoerweite.
+#        EN: 1 = party/raid members are always fully audible (also on other maps/in instances);
+#            their position only sets the direction, never the volume. Strangers only within range.
+#        Default: 1
+
+Voice.GroupAlwaysAudible = 1

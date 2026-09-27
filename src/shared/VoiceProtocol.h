@@ -52,7 +52,11 @@ namespace VoiceProto
     };
 
     struct Context { std::string context; uint32_t seq = 0; };
-    struct Nearby { std::vector<uint32_t> sessions; };
+    // DE: sessions = Fremde in Hoerweite (Lautstaerke nach Entfernung), group = Gruppen-/Raidmitglieder
+    //     (immer voll hoerbar, Position nur fuer die Richtung, auch ueber Maps hinweg).
+    // EN: sessions = strangers in range (volume by distance), group = party/raid members
+    //     (always fully audible, position only for direction, even across maps).
+    struct Nearby { std::vector<uint32_t> sessions, group; };
     struct Bound { uint32_t session = 0; };
     struct Disabled { std::string reason; };
 
@@ -111,6 +115,7 @@ namespace VoiceProto
     {
         MumbleProto::Writer w;
         for (uint32_t s : m.sessions) w.U32(1, s);
+        for (uint32_t s : m.group) w.U32(2, s);
         return Wrap(Msg::Nearby, w);
     }
 
@@ -182,7 +187,10 @@ namespace VoiceProto
         MumbleProto::Reader r(b, n);
         MumbleProto::Field f;
         while (r.Next(f))
+        {
             if (f.number == 1) m.sessions.push_back(f.U32());
+            else if (f.number == 2) m.group.push_back(f.U32());
+        }
         return r.ok();
     }
 

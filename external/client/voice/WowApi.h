@@ -38,6 +38,10 @@ namespace wow
         constexpr uintptr_t FrameScriptExecute    = 0x00819210;  // __cdecl(code, source, 0)                (Phase 7)
         constexpr uintptr_t FrameScriptSignal     = 0x0081B530;  // __cdecl(eventId, fmt, ...)              (Phase 7)
 
+        constexpr uintptr_t ClientConnection      = 0x00C79CF4;  // ClientServices::s_currentConnection (NetClient*)
+        constexpr uint32_t  NetHandlers           = 0x53C;       // NetClient: handler[opcode]  (0x631FA0)
+        constexpr uint32_t  NetHandlerParams      = 0x19B8;      // NetClient: param[opcode]    (0x631FA0)
+        constexpr uint32_t  NetMaxOpcode          = 0x51F;       // Dispatcher prueft < 0x51F / dispatcher checks < 0x51F
         constexpr uintptr_t MainWindow            = 0x00D41620;  // HWND (auch in St0ny's FlashWindow-Patch / also used by)
         constexpr uintptr_t CurrentMapId          = 0x00BD088C;  // int32 (WotLK-Extensions; wow3.dll nutzt 0xAB63BC)
         constexpr uintptr_t PlayerName            = 0x00C79D18;  // char[] (wow3.dll)
@@ -54,6 +58,19 @@ namespace wow
     uint64_t ActivePlayerGuid();
     bool PlayerPosition(C3Vector& pos, float& facing);
     bool CameraPosition(C3Vector& pos);
+
+    // DE: Netzwerk (nur Hauptthread). Handler-Aufruf laut Dispatcher 0x631FE0:
+    //     cdecl(param, opcode, time, CDataStore*), Lesezeiger steht hinter dem Opcode.
+    // EN: network (main thread only). Handler call per dispatcher 0x631FE0:
+    //     cdecl(param, opcode, time, CDataStore*), read position is behind the opcode.
+    using MessageHandler = int(__cdecl*)(void* param, uint32_t opcode, uint32_t time, void* msg);
+    bool NetConnected();
+    MessageHandler GetMessageHandler(uint32_t opcode, void** param);
+    bool SetMessageHandler(uint32_t opcode, MessageHandler fn, void* param);
+    bool SendPacket(uint32_t opcode, const uint8_t* data, size_t len);
+    // DE: Restliche Bytes eines empfangenen Pakets (ohne Verbrauch). EN: remaining bytes of a received packet (not consumed).
+    bool PeekPacket(void* msg, const uint8_t*& data, size_t& len);
+    void ConsumePacket(void* msg);
 
     // DE: Ueberall nutzbar (abgesichertes Lesen). EN: usable anywhere (guarded reads).
     bool SafeRead(uintptr_t addr, void* out, size_t len);
