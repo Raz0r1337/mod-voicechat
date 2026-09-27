@@ -14,13 +14,15 @@ Wichtig in jeder Variante:
 
 ```sh
 sudo apt install mumble-server
-sudo cp mumble-server.ini.example /etc/mumble-server.ini    # oder nur die Werte übernehmen
+sudo cp /etc/mumble/mumble-server.ini /etc/mumble/mumble-server.ini.orig   # Sicherung
+sudo nano /etc/mumble/mumble-server.ini   # Werte aus mumble-server.ini.example übernehmen
 sudo systemctl restart mumble-server
 sudo systemctl status mumble-server
 ```
 
-- **Log:** `/var/log/mumble-server/mumble-server.log`
-- **SuperUser-Passwort** (erst ab Phase 5 für den Bot nötig): `sudo mumble-server -ini /etc/mumble-server.ini -supw <passwort>`
+- **Konfiguration:** `/etc/mumble/mumble-server.ini` (ältere Pakete bis Mumble 1.4: `/etc/mumble-server.ini`)
+- **Log:** `sudo journalctl -u mumble-server -f`
+- **SuperUser-Passwort** (erst ab Phase 5 für den Bot nötig): `sudo mumble-server -ini /etc/mumble/mumble-server.ini -supw <passwort>`
 
 ## Variante B: Docker
 
@@ -35,7 +37,7 @@ Die Werte stehen als `MUMBLE_CONFIG_*`-Variablen in `docker-compose.yml`.
 ## Variante C: Windows
 
 1. Den offiziellen Mumble-Installer von [mumble.info](https://www.mumble.info/downloads/) starten und nur die Komponente **Server** auswählen.
-2. `mumble-server.ini.example` als `mumble-server.ini` neben die Server-exe legen und die Linux-Pfade bei `database`/`logfile` entfernen oder anpassen.
+2. `mumble-server.ini.example` als `mumble-server.ini` neben die Server-exe legen. Bei Bedarf `database` und `logfile` aktivieren, sie sind dort auskommentiert.
 3. Starten: `mumble-server.exe -ini mumble-server.ini`
 
 ## Testen, ob der Server passt
