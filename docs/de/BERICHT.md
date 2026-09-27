@@ -313,7 +313,7 @@ mod-voicechat/                     ← direkt als modules/mod-voicechat klonbar
 - **Tests am Client** ab Phase 3b: Ich kann hier bauen und gegen Murmur testen, aber nicht WoW ausführen.
 - **Verifikation der ❓-Adressen** (Checkliste kommt mit Phase 3b; optional x32dbg/IDA).
 - **MPQ-Extrakte:** vorerst nicht nötig, die FrameXML ist öffentlich.
-- ~~Entscheidung Loader~~: erledigt, `external/client/loader/` (eigene Sektion `.vcl`, nur Einstiegspunkt umgebogen; kompatibel mit St0ny's Patcher).
+- ~~Entscheidung Loader~~: erledigt, `external/client/loader/`: 29 Byte in einer int3-Lücke, Dateigröße und PE-Header unverändert, kompatibel mit St0ny's Patcher.
 
 ---
 
