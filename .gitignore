@@ -20,3 +20,10 @@ out/
 # OS
 .DS_Store
 Thumbs.db
+
+# Blizzard binaries / backups - never commit (copyright)
+*.BAK
+*.bak
+*.ORI
+*.MPQ
+*.mpq
