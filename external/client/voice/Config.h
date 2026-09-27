@@ -32,9 +32,11 @@ namespace voice
         std::string inputDevice;         // Teilstring, leer = Standard / substring, empty = default
         std::string outputDevice;
 
-        // [Wow]  DE: Hypothesen aus wow3.dll (Build 12340). EN: hypotheses from wow3.dll (build 12340)
-        uintptr_t inWorldAddress = 0x00BD0792;
-        uintptr_t nameAddress = 0x00C79D18;
+        // [Spatial]
+        float minDistance = 3.0f;        // Yards: volle Lautstaerke / full volume
+        float maxDistance = 40.0f;       // Yards: ab hier stumm / silent from here
+        std::string listenerMode = "camera";   // camera | character
+        bool hearWithoutPosition = false;
 
         // [Debug]
         bool log = true;

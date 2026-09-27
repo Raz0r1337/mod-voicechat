@@ -32,9 +32,17 @@ jobs:
           mumble-server -ini /tmp/murmur/murmur.ini -fg > /tmp/murmur/stdout.log 2>&1 &
           sleep 3
 
+      - name: Unit tests (spatial math, mixer)
+        working-directory: build
+        run: ctest --output-on-failure
+
       - name: End-to-end test (UDP + TCP tunnel)
         working-directory: build
         run: ../external/client/tests/e2e.sh tools/voicecli/voicecli
+
+      - name: End-to-end positional test (near / far / other map)
+        working-directory: build
+        run: ../external/client/tests/e2e_positional.sh tools/voicecli/voicecli
 
   windows-win32:
     runs-on: windows-2022
@@ -43,7 +51,7 @@ jobs:
 
       - name: Build voice.dll (Win32)
         run: |
-          cmake -S external/client -B build -A Win32
+          cmake -S external/client -B build -A Win32 -DVC_BUILD_TESTS=OFF
           cmake --build build --config Release -j 4
 
       - uses: actions/upload-artifact@v4

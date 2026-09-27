@@ -16,21 +16,25 @@
 
 Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`) nutzt später auch das AzerothCore-Modul.
 
-## Stand Phase 3
+## Stand Phase 4
 
 **Was funktioniert:**
 - Mikrofon → Opus → Murmur → andere Clients → Lautsprecher
-- Verbinden beim Betreten der Welt (Name = Charaktername), Trennen beim Logout
-- Reconnect mit Backoff
+- **Positional Voice:** Jede Sprachnachricht trägt die Position des Sprechers. Beim Hörer wird nach Entfernung (bis `MinDistance` voll, ab `MaxDistance` stumm) und Richtung gemischt, mit Stereo-Panning und dumpferem Klang von hinten.
+- **Trennung nach Map:** Der Mumble-Kontext ist `wow335|<Map-ID>`. Murmur gibt Positionen nur innerhalb derselben Map weiter, Sprecher ohne Position sind stumm.
+- **Verbinden und Trennen:** Verbinden beim Betreten der Welt (Name = Charaktername), Trennen beim Logout, Reconnect mit Backoff.
+- **Kein Code-Patch für den Hauptthread:** Spiel-Daten werden im WoW-Hauptthread gelesen. Dafür wird das WoW-Fenster gesubclassed; einen Code-Patch braucht das nicht.
 
 **Bewusst noch nicht enthalten:**
-- **Keine Positionen und keine Isolation:** Alle im selben Murmur-Channel hören sich (Phase 4/5).
-- **Keine AzerothCore-Anbindung:** Server und Passwort kommen aus `voice.ini` (Phase 5).
+- **Keine Instanz-Trennung und keine Rechte:** Das kommt mit der AzerothCore-Anbindung (Phase 5), ebenso das Beschränken auf Spieler in der Nähe (Bandbreite).
+- **Keine Wände/Occlusion** (Phase 6).
 - **Eigene PTT-Taste:** Die Taste steht in `voice.ini`, die WoW-Tastenbelegung wird noch nicht genutzt (Phase 7).
-- **Unverifizierte Adressen:** Die Welt-Erkennung liest zwei Adressen aus `wow3.dll` (`0xBD0792`, `0xC79D18`). Sie sind **nicht verifiziert** und lassen sich in `voice.ini` überschreiben.
+- **Adressen nur statisch geprüft:** Alle Client-Adressen stehen in `voice/WowApi.h`. Sie sind an der originalen 12340-Exe **statisch geprüft**, aber noch **nicht zur Laufzeit**.
 
 **Hier getestet:**
-- voicecli → Murmur 1.5.517 → voicecli über UDP und über den TCP-Tunnel: 200/200 Pakete, 199 saubere 440-Hz-Frames.
+- **Übertragung:** voicecli → Murmur 1.5.517 → voicecli über UDP und über den TCP-Tunnel: 200/200 Pakete, 199 saubere 440-Hz-Frames.
+- **Positionen über Murmur:** Ein Sprecher in 5 yd ist hörbar. In 100 yd ist er stumm, obwohl Pakete ankommen. Auf einer anderen Map ist er stumm, weil Murmur die Position entfernt.
+- **Unit-Tests:** Entfernung, Panning, Drehung, hinten/vorne, Occlusion-Formel, Koordinaten und knackfreie Lautstärke-Rampen.
 - `voice.dll` wird fehlerfrei als 32-Bit-DLL gebaut und importiert nur System-DLLs.
 - **In WoW selbst ist nichts getestet.**
 
@@ -60,9 +64,10 @@ Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`) nutzt später auch
 
 - [ ] Startet WoW normal, mit und ohne `voice.dll`?
 - [ ] Steht `voice.dll started` in `voice.log`?
-- [ ] Erscheint beim Betreten der Welt `connecting as '<Charaktername>'` und danach `connected, session N`? Falls nicht, sind die `[Wow]`-Adressen falsch. Zum Testen `AutoConnectInWorld=0` und `Username=Test` setzen.
+- [ ] Erscheint beim Betreten der Welt `connecting as '<Charaktername>'` und danach `connected, session N`? Falls nicht, zum Testen `AutoConnectInWorld=0` und `Username=Test` setzen und `voice.log` schicken (dann passt eine Adresse in `WowApi.h` nicht).
 - [ ] Steht `UDP active` im Log?
-- [ ] Hören sich zwei Clients gegenseitig?
+- [ ] Hören sich zwei Clients gegenseitig? Wird es leiser, wenn man weggeht, ab ca. 40 yd stumm? Kommt die Stimme von der richtigen Seite?
+- [ ] Steht beim Betreten einer anderen Map `context wow335|<Map>` im Log?
 - [ ] Wird beim Logout getrennt (`disconnect: left world`) und das Mikrofon freigegeben?
 - [ ] Verbindet der Client neu, wenn Murmur neu startet?
 

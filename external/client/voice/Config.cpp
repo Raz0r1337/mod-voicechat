@@ -32,11 +32,6 @@ namespace voice
             return v.empty() ? def : float(std::atof(v.c_str()));
         }
 
-        uintptr_t GetAddr(const std::string& path, const char* sec, const char* key, uintptr_t def)
-        {
-            std::string v = Get(path, sec, key, "");
-            return v.empty() ? def : uintptr_t(std::strtoul(v.c_str(), nullptr, 0));
-        }
     }
 
     std::string Config::ModuleDir()
@@ -72,8 +67,10 @@ namespace voice
         inputDevice = Get(path, "Audio", "InputDevice", inputDevice);
         outputDevice = Get(path, "Audio", "OutputDevice", outputDevice);
 
-        inWorldAddress = GetAddr(path, "Wow", "InWorldAddress", inWorldAddress);
-        nameAddress = GetAddr(path, "Wow", "NameAddress", nameAddress);
+        minDistance = GetF(path, "Spatial", "MinDistance", minDistance);
+        maxDistance = GetF(path, "Spatial", "MaxDistance", maxDistance);
+        listenerMode = Get(path, "Spatial", "ListenerMode", listenerMode);
+        hearWithoutPosition = GetPrivateProfileIntA("Spatial", "HearWithoutPosition", hearWithoutPosition, path.c_str()) != 0;
 
         log = GetPrivateProfileIntA("Debug", "Log", log, path.c_str()) != 0;
         return true;
