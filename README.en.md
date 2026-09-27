@@ -6,7 +6,7 @@
 
 Native 3D proximity voice for **World of Warcraft 3.3.5a (build 12340)** and **AzerothCore**, using **Murmur** (Mumble server) as the voice backend.
 
-> **Status: phases 3–5 built, awaiting the first test in WoW.** Positional voice with AzerothCore integration (permissions, map/instance, group), still without occlusion and without the Blizzard UI.
+> **Status: phases 3–6 built, awaiting the first test in WoW.** Positional voice with AzerothCore integration (permissions, map/instance, group) and damping through walls (occlusion), still without the Blizzard UI.
 > The full report is in [docs/en/REPORT.md](docs/en/REPORT.md).
 
 ## Goal
@@ -16,7 +16,7 @@ Native 3D proximity voice for **World of Warcraft 3.3.5a (build 12340)** and **A
 | Player | only the modified `Wow.exe` + `voice.dll`, **no** Mumble, TeamSpeak or Discord client and **no** `wow3.dll` |
 | Server | AzerothCore with this module + a self-hosted Murmur server |
 
-- **Positional audio:** volume by distance, direction via stereo/3D, later damping through walls (occlusion)
+- **Positional audio:** volume by distance, direction via stereo/3D, damping through walls and terrain (occlusion: quieter and duller, soft transition at corners)
 - **Separate worlds:** continents and every instance (e.g. Naxxramas #42 and #43) are isolated from each other
 - **Party/raid:** group members are always heard at full volume, even on other maps or in instances. Their position only sets the direction of the voice. Strangers are only heard within range, getting quieter with distance.
 - **Integration:** feels like the original WoW voice (Blizzard voice UI, push-to-talk, options)
@@ -81,7 +81,7 @@ Players muted in chat (`.mute`) are also muted in voice by default (`Voice.MuteC
 | 3 | Proof of concept: client A ↔ Murmur ↔ client B with Opus ([client docs](external/client/README.en.md)) | 🧪 built, awaiting test in WoW |
 | 4 | Positional audio (X/Y/Z, orientation, distance, direction) | 🧪 built, awaiting test in WoW |
 | 5 | AzerothCore integration (login/logout, map/instance, permissions, group) | 🧪 built, awaiting test in WoW |
-| 6 | Occlusion (raycast, attenuation, low-pass) | – |
+| 6 | Occlusion (raycast, attenuation, low-pass) | 🧪 built, awaiting test in WoW |
 | 7 | Native Blizzard voice UI | – |
 
 ## References

@@ -16,7 +16,7 @@
 
 Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtocol.h`) nutzen `voice.dll` und das AzerothCore-Modul gemeinsam.
 
-## Stand Phase 5
+## Stand Phase 6
 
 **Was funktioniert:**
 - **Übertragung:** Mikrofon → Opus → Murmur → andere Clients → Lautsprecher.
@@ -26,13 +26,16 @@ Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`, `src/shared/VoiceP
   - Hat der Server `mod-voicechat`, kommen Murmur-Adresse, Name, Channel (Map/Instanz) und Rechte von dort.
   - Die Mumble-Session wird per Einmal-Nonce an den Charakter gebunden.
   - Ohne Antwort (Server ohne Modul) läuft alles eigenständig wie in Phase 4.
-- **Gruppe/Raid:** Mitglieder sind immer voll hörbar, auch auf anderen Maps oder in Instanzen. Ihre Position bestimmt nur die Richtung: nie leiser, keine Dämpfung von hinten, später keine Occlusion. Mitglieder auf einer anderen Map klingen mittig.
+- **Gruppe/Raid:** Mitglieder sind immer voll hörbar, auch auf anderen Maps oder in Instanzen. Ihre Position bestimmt nur die Richtung: nie leiser, keine Dämpfung von hinten, keine Occlusion. Mitglieder auf einer anderen Map klingen mittig.
 - **Fremde:** Sie sind nur hörbar, wenn der Server sie als „in Hörweite“ meldet, und werden mit der Entfernung leiser.
+- **Occlusion:** Wände, Gebäude und Gelände zwischen dir und einem Fremden machen dessen Stimme leiser und dumpfer. Einstellbar in `voice.ini [Occlusion]` (Pegel und Tiefpass bei voller Verdeckung).
+  - Pro Sprecher gehen 3 Sichtstrahlen (Mitte, links, rechts) über WoWs eigenes `TraceLine`. Der Anteil blockierter Strahlen ergibt einen weichen Übergang an Ecken.
+  - Die Strahlen laufen im Hauptthread mit festem Budget pro Frame und werden etwa alle 100 ms erneuert. Übergänge sind geglättet (~120 ms).
+  - Gruppenmitglieder sind nie betroffen.
 - **Senden:** Gesendet wird nur an „nah + Gruppe“ (Mumble-Whisper). Das spart Bandbreite, und ein manipulierter Client kann niemandem Audio aufzwingen.
 - **Kein Code-Patch:** Spiel-Daten und Pakete werden im WoW-Hauptthread verarbeitet (gesubclasstes WoW-Fenster). Für die Serverpakete wird nur ein Handler in WoWs Handler-Tabelle eingetragen, fremde Pakete gehen an den Original-Handler.
 
 **Bewusst noch nicht enthalten:**
-- **Keine Wände/Occlusion** (Phase 6).
 - **Eigene PTT-Taste:** Die Taste steht in `voice.ini`, die WoW-Tastenbelegung und die Blizzard-Voice-UI folgen in Phase 7.
 - **Adressen nur statisch geprüft:** Alle Client-Adressen stehen in `voice/WowApi.h`. Sie sind an der originalen 12340-Exe **statisch geprüft** (Disassembly: Handler-Tabelle `conn+0x53C`, Aufruf `cdecl(param, opcode, time, CDataStore*)`), aber noch **nicht zur Laufzeit**.
 
@@ -45,7 +48,7 @@ Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`, `src/shared/VoiceP
   - Verschiedene Channels hören sich nicht.
   - Ungebundene Nutzer werden gekickt.
   - Flüstern über Channel-Grenzen (Gruppe) kommt an.
-- **Unit-Tests:** Entfernung, Panning, Drehung, hinten/vorne, Occlusion-Formel, Gruppen-Modus (nie leiser), Koordinaten und knackfreie Lautstärke-Rampen.
+- **Unit-Tests:** Entfernung, Panning, Drehung, hinten/vorne, Occlusion-Formel, Gruppen-Modus (nie leiser), Koordinaten und knackfreie Lautstärke-Rampen. Dazu der Occlusion-Tracker mit einer Test-Wand: voll, frei, teilweise (1/3), Strahlbudget, Glättung und Aufräumen.
 - **Builds:** `voice.dll` wird fehlerfrei als 32-Bit-DLL gebaut, und das AzerothCore-Modul kompiliert ohne Warnungen.
 - **In WoW selbst ist nichts getestet.**
 
@@ -76,7 +79,7 @@ Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`, `src/shared/VoiceP
 ## Test-Checkliste (bitte `voice.log` und das Worldserver-Log zurückmelden)
 
 - [ ] Startet WoW normal, mit und ohne `voice.dll`?
-- [ ] Steht `voice.dll started (phase 5)` in `voice.log`?
+- [ ] Steht `voice.dll started (phase 6)` in `voice.log`?
 - [ ] Steht nach dem Betreten der Welt `ServerLink: SMSG handler installed` im Log?
 - [ ] **Mit Modul:** Erscheinen im Log nacheinander:
   - [ ] `server config: <host>:<port> as '<Name>'`
@@ -89,6 +92,7 @@ Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`, `src/shared/VoiceP
 - [ ] Steht `UDP active` im Log?
 - [ ] **Fremde:** Hören sich zwei Clients (nicht in einer Gruppe) gegenseitig? Wird es leiser, wenn man weggeht, und ist es ab ca. 40 yd stumm? Kommt die Stimme von der richtigen Seite?
 - [ ] **Gruppe:** Hört man ein Gruppenmitglied auch in 200 yd noch voll und aus der richtigen Richtung? Hört man es auch, wenn es in einer Instanz oder auf einem anderen Kontinent ist?
+- [ ] **Occlusion:** Wird ein Fremder hinter einer Hauswand oder einem Hügel leiser und dumpfer, und kommt der Klang beim Hervortreten weich zurück? Bleibt ein Gruppenmitglied hinter der Wand unverändert? Taucht `occlusion: access violation` im Log auf, passt die Adresse von `TraceLine` nicht, dann bitte melden.
 - [ ] Wechselt beim Betreten einer Instanz der Kontext, und hören sich Spieler in verschiedenen Instanzen derselben Dungeon-ID nicht (außer in derselben Gruppe)?
 - [ ] Funktionieren `.voice status`, `.voice mute <Name>`, `.voice unmute <Name>` und `.voice kick <Name>`?
 - [ ] Wird beim Logout getrennt (`disconnect: left world`) und das Mikrofon freigegeben?

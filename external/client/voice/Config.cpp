@@ -73,6 +73,14 @@ namespace voice
         listenerMode = Get(path, "Spatial", "ListenerMode", listenerMode);
         hearWithoutPosition = GetPrivateProfileIntA("Spatial", "HearWithoutPosition", hearWithoutPosition, path.c_str()) != 0;
 
+        occlusion = GetPrivateProfileIntA("Occlusion", "Enabled", occlusion, path.c_str()) != 0;
+        occlusionGain = GetF(path, "Occlusion", "Gain", occlusionGain);
+        occlusionLowpassHz = GetF(path, "Occlusion", "LowpassHz", occlusionLowpassHz);
+        std::string flags = Get(path, "Occlusion", "Flags", "");
+        if (!flags.empty()) occlusionFlags = uint32_t(std::strtoul(flags.c_str(), nullptr, 0));
+        occlusionHeadHeight = GetF(path, "Occlusion", "HeadHeight", occlusionHeadHeight);
+        occlusionRaysPerTick = GetPrivateProfileIntA("Occlusion", "RaysPerTick", occlusionRaysPerTick, path.c_str());
+
         log = GetPrivateProfileIntA("Debug", "Log", log, path.c_str()) != 0;
         return true;
     }

@@ -195,6 +195,20 @@ Murmur weg          : Client-Backoff-Reconnect; UI zeigt Status (VOICE_STATUS_UP
 - **Materialien:** Die Kollisionsflags unterscheiden Terrain, WMO und M2. Echte Materialien gibt es nicht, WMO-Gruppen- oder Doodad-IDs wären ein späterer Ansatz ❓.
 - **Serverseitig** (AC-VMAP `isInLineOfSight`) ginge es auch, aber mit Latenz und Serverlast. Das kommt nur als Anti-Cheat-Option in Frage.
 
+**Umsetzung Phase 6:**
+- **Signatur (Disassembly):** `bool __cdecl TraceLine(start*, end*, hit* (optional), float* fraction, flags, 0)`.
+  - `fraction` geht mit 1.0 hinein und kommt als Trefferanteil heraus: `hit = start + (end − start) · fraction`.
+  - Der einzige direkte Aufruf in WoW (0x77F550) nutzt die Flags `0x100111` (Terrain + WMO + Modelle + bewegliche Objekte). Das ist unser Standard, einstellbar in `voice.ini`.
+- **Strahlen:** 3 pro Sprecher, von Kopf zu Kopf (Kopfhöhe 1,5 yd): Mitte sowie ±0,7 yd seitlich versetzt. Occlusion = Anteil blockierter Strahlen.
+- **Budget und Glättung:**
+  - 9 Strahlen pro Frame, die fälligsten Sprecher zuerst, jeder etwa alle 100 ms.
+  - Glättung mit einer Zeitkonstante von 120 ms. Das erste Ergebnis greift sofort, damit ein neuer Sprecher hinter der Wand nicht erst laut ist.
+- **Wirkung:** `Pegel · (1 − o · (1 − Gain))` mit `Gain` = 0,35 und Tiefpass bis 1 kHz bei voller Verdeckung.
+  - Es trifft nur Fremde, die gerade sprechen und in Reichweite sind.
+  - Die Gruppe ist nie betroffen.
+- **Absturzschutz:** Die Aufrufe laufen im Hauptthread mit SEH-Schutz (MSVC). Bei einer Zugriffsverletzung wird Occlusion abgeschaltet und ins Log geschrieben.
+- **Tests:** `OcclusionTracker` liegt in voicecore und wird mit einer Test-Wand geprüft (`tests/occlusion_test.cpp`).
+
 ### 3.8 Threads und Robustheit
 
 - **Client:**
@@ -347,7 +361,7 @@ mod-voicechat/                     ← direkt als modules/mod-voicechat klonbar
 | H1 | Der Comsat-Codec ist nicht Opus-kompatibel | irrelevant für das Design; optional Strings-Analyse von Wow.exe |
 | H2 | `EnableVoiceChat=1` ohne Roster startet keine störende Aufnahme | Test am Client; notfalls Comsat-Init hooken |
 | H3 | Die Handler-Übernahme eines Voice-SMSG über `SetMessageHandler` (0x631FA0) ist stabil | PoC in Phase 5 |
-| H4 | `TraceLine` bei 0x7A3B70 mit Terrain-/WMO-/M2-Flags | Debugger-Test in Phase 6 |
+| H4 | `TraceLine` bei 0x7A3B70 mit Terrain-/WMO-/M2-Flags | statisch bestätigt (siehe 3.7), Laufzeittest steht aus |
 | H5 | Map-ID-Adresse 0xBD088C vs. 0xAB63BC | Abgleich im Spiel (Kontinent vs. Instanz) |
 | H6 | `LoadFunctions`-Hook erlaubt das Überschreiben der Blizzard-Voice-Lua-Funktionen nach /reload | Phase 7 |
 | H7 | Das Blizzard-UI reagiert korrekt auf selbst ausgelöste `VOICE_*`-Events | Phase 7 |

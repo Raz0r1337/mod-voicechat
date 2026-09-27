@@ -6,7 +6,7 @@
 
 Natives 3D-Proximity-Voice für **World of Warcraft 3.3.5a (Build 12340)** und **AzerothCore**, mit **Murmur** (Mumble-Server) als Voice-Backend.
 
-> **Status: Phasen 3–5 gebaut, warten auf den ersten Test in WoW.** Positional Voice mit AzerothCore-Anbindung (Rechte, Map/Instanz, Gruppe), noch ohne Occlusion und ohne Blizzard-UI.
+> **Status: Phasen 3–6 gebaut, warten auf den ersten Test in WoW.** Positional Voice mit AzerothCore-Anbindung (Rechte, Map/Instanz, Gruppe) und Dämpfung durch Wände (Occlusion), noch ohne Blizzard-UI.
 > Den vollständigen Bericht findest du unter [docs/de/BERICHT.md](docs/de/BERICHT.md).
 
 ## Ziel
@@ -16,7 +16,7 @@ Natives 3D-Proximity-Voice für **World of Warcraft 3.3.5a (Build 12340)** und *
 | Spieler | nur den modifizierten `Wow.exe` + `voice.dll`, **keinen** Mumble-, TeamSpeak- oder Discord-Client und **kein** `wow3.dll` |
 | Server | AzerothCore mit diesem Modul + einen eigenen Murmur-Server |
 
-- **Positional Audio:** Lautstärke nach Entfernung, Richtung per Stereo/3D, später Dämpfung durch Wände (Occlusion)
+- **Positional Audio:** Lautstärke nach Entfernung, Richtung per Stereo/3D, Dämpfung durch Wände und Gelände (Occlusion: leiser und dumpfer, weicher Übergang an Ecken)
 - **Getrennte Welten:** Kontinente und jede Instanz (z. B. Naxxramas #42 und #43) sind voneinander isoliert
 - **Gruppe/Raid:** Gruppenmitglieder hört man immer in voller Lautstärke, auch auf anderen Maps oder in Instanzen. Ihre Position bestimmt nur die Richtung der Stimme. Fremde hört man nur in Hörweite, leiser mit zunehmender Entfernung.
 - **Integration:** fühlt sich an wie das originale WoW-Voice (Blizzard-Voice-UI, Push-to-Talk, Optionen)
@@ -81,7 +81,7 @@ Wer im Chat stummgeschaltet ist (`.mute`), ist standardmäßig auch im Voice stu
 | 3 | Proof of Concept: Client A ↔ Murmur ↔ Client B mit Opus ([Client-Doku](external/client/README.md)) | 🧪 gebaut, wartet auf Test in WoW |
 | 4 | Positional Audio (X/Y/Z, Orientierung, Distanz, Richtung) | 🧪 gebaut, wartet auf Test in WoW |
 | 5 | AzerothCore-Integration (Login/Logout, Map/Instanz, Rechte, Gruppe) | 🧪 gebaut, wartet auf Test in WoW |
-| 6 | Occlusion (Raycast, Dämpfung, Tiefpass) | – |
+| 6 | Occlusion (Raycast, Dämpfung, Tiefpass) | 🧪 gebaut, wartet auf Test in WoW |
 | 7 | Native Blizzard-Voice-UI | – |
 
 ## Referenzen

@@ -41,7 +41,7 @@ namespace voice
         std::string ini = Config::ModuleDir() + "\\voice.ini";
         bool haveIni = _cfg.Load(ini);
         SetLogEnabled(_cfg.log);
-        Log("mod-voicechat voice.dll started (phase 5), ini " + std::string(haveIni ? "loaded" : "missing -> defaults") +
+        Log("mod-voicechat voice.dll started (phase 6), ini " + std::string(haveIni ? "loaded" : "missing -> defaults") +
             ", mode " + _cfg.serverMode);
 
         if (_cfg.serverMode != "auto" && _cfg.serverMode != "server" && _cfg.serverMode != "standalone")
@@ -51,6 +51,14 @@ namespace voice
         }
         _spatial.minDistance = _cfg.minDistance;
         _spatial.maxDistance = _cfg.maxDistance;
+        _cfg.occlusionRaysPerTick = std::clamp(_cfg.occlusionRaysPerTick, OcclusionTracker::RAYS_PER_SPEAKER, 60);
+        _cfg.occlusionGain = std::clamp(_cfg.occlusionGain, 0.0f, 1.0f);
+        _occOff = !_cfg.occlusion;
+        {
+            OcclusionParams op;
+            op.headHeight = _cfg.occlusionHeadHeight;
+            _occ.SetParams(op);
+        }
 
         if (!_tx.Init(_cfg.bitrate)) { Log("opus init failed - voice disabled"); return; }
         _tx.SetMode(_cfg.mode == "vad" ? TransmitMode::VoiceActivation
@@ -82,13 +90,17 @@ namespace voice
                 std::lock_guard<std::mutex> g(_posMutex);
                 if (a.hasPosition) _speakerPos[a.senderSession] = spatial::MumbleToWow({ *a.pos[0], *a.pos[1], *a.pos[2] });
                 else _speakerPos.erase(a.senderSession);
+                _speakerSeen[a.senderSession] = GetTickCount64();
             }
             _mixer.Push(a.senderSession, a.frameNumber, a.opus, a.isTerminator);
         };
         _client.onLog = [](const std::string& m) { Log("mumble: " + m); };
         _client.onDisconnected = [this](const std::string& r) { Log("mumble disconnected: " + r); _lost = true; };
         // DE: MVCP-Pakete im Hauptthread senden/empfangen. EN: send/receive MVCP packets on the main thread.
-        _game.onTick = [this](const GameSnapshot& s) { _server.MainTick(s.inWorld); };
+        _game.onTick = [this](const GameSnapshot& s) {
+            _server.MainTick(s.inWorld);
+            if (s.inWorld && !_occOff) TraceOcclusion(s);
+        };
 
         unsigned long long lastAttachTry = 0;
         while (!_stop)
@@ -149,6 +161,12 @@ namespace voice
                         break;
                     case Link::Off: break;
                 }
+            }
+
+            if (!_occOff && now >= _nextOccUpdate)
+            {
+                _nextOccUpdate = now + 100;
+                UpdateOcclusionCandidates(now);
             }
 
             if (_active && _client.State() == ClientState::Connected)
@@ -392,6 +410,62 @@ namespace voice
     }
 
     // ------------------------------------------------------------------------------------------
+    //  Occlusion (Phase 6)
+    // ------------------------------------------------------------------------------------------
+    void VoiceApp::UpdateOcclusionCandidates(unsigned long long now)
+    {
+        // DE: Nur Fremde, die gerade sprechen und in Reichweite sind; Gruppe nie (nur Richtung).
+        // EN: only strangers who are talking and in range; never the group (direction only).
+        std::vector<std::pair<uint32_t, spatial::Vec3>> list;
+        {
+            std::lock_guard<std::mutex> g(_posMutex);
+            for (auto it = _speakerSeen.begin(); it != _speakerSeen.end();)
+            {
+                if (now - it->second > 60000) it = _speakerSeen.erase(it);   // alte Eintraege / old entries
+                else ++it;
+            }
+            float range = _spatial.maxDistance;
+            for (const auto& kv : _speakerPos)
+            {
+                auto seen = _speakerSeen.find(kv.first);
+                if (seen == _speakerSeen.end() || now - seen->second > 1500) continue;
+                if (_serverLists && (_group.count(kv.first) || !_nearby.count(kv.first))) continue;
+                float dx = kv.second.x - _listener.pos.x, dy = kv.second.y - _listener.pos.y, dz = kv.second.z - _listener.pos.z;
+                if (dx * dx + dy * dy + dz * dz > range * range) continue;
+                list.emplace_back(kv.first, kv.second);
+            }
+        }
+        _occ.SetCandidates(list);
+    }
+
+    namespace
+    {
+        struct RayCtx { wow::C3Vector from, to; uint32_t flags; bool hit; };
+        void TraceRay(void* p)
+        {
+            auto* c = static_cast<RayCtx*>(p);
+            c->hit = wow::TraceLine(c->from, c->to, c->flags);
+        }
+    }
+
+    void VoiceApp::TraceOcclusion(const GameSnapshot& s)
+    {
+        uint32_t flags = _cfg.occlusionFlags;
+        _occ.Trace({ s.pos.x, s.pos.y, s.pos.z }, _cfg.occlusionRaysPerTick, GetTickCount64(),
+            [this, flags](const spatial::Vec3& from, const spatial::Vec3& to) {
+                if (_occOff) return false;
+                RayCtx c{ { from.x, from.y, from.z }, { to.x, to.y, to.z }, flags, false };
+                if (!wow::Guarded(&TraceRay, &c))
+                {
+                    _occOff = true;
+                    Log("occlusion: access violation in TraceLine - occlusion disabled");
+                    return false;
+                }
+                return c.hit;
+            });
+    }
+
+    // ------------------------------------------------------------------------------------------
     //  Audio
     // ------------------------------------------------------------------------------------------
     SpeakerGain VoiceApp::GainFor(uint32_t session)
@@ -421,7 +495,8 @@ namespace voice
             // EN: without position (other map/not a WoW client) silent by default.
             return _cfg.hearWithoutPosition ? SpeakerGain() : silent;
         }
-        return spatial::Compute(_listener, it->second, _spatial);
+        float occ = _occOff ? 0.0f : _occ.Get(session, GetTickCount64());
+        return spatial::Compute(_listener, it->second, _spatial, occ, _cfg.occlusionGain, _cfg.occlusionLowpassHz);
     }
 
     void VoiceApp::Connect(const ClientConfig& cc)
@@ -445,6 +520,7 @@ namespace voice
         {
             std::lock_guard<std::mutex> g(_posMutex);
             _speakerPos.clear();
+            _speakerSeen.clear();
             _nearby.clear();
             _group.clear();
             _serverLists = false;
@@ -452,6 +528,7 @@ namespace voice
             _spatial.maxDistance = _cfg.maxDistance;
         }
         _target.clear();
+        _occ.Clear();
         if (!_active) return;
         Log(std::string("disconnect: ") + why);
         _tx.SetPushToTalk(false);

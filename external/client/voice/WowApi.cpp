@@ -52,6 +52,14 @@ namespace wow
         return true;
     }
 
+    bool TraceLine(const C3Vector& start, const C3Vector& end, uint32_t flags)
+    {
+        using Fn = bool(__cdecl*)(const C3Vector*, const C3Vector*, C3Vector*, float*, uint32_t, uint32_t);
+        C3Vector hit;
+        float fraction = 1.0f;
+        return reinterpret_cast<Fn>(addr::TraceLine)(&start, &end, &hit, &fraction, flags, 0);
+    }
+
     uint32_t CurrentMapId()
     {
         int32_t id = -1;

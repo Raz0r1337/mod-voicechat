@@ -11,6 +11,7 @@
 
 #include "voicecore/AudioMixer.h"
 #include "voicecore/MumbleClient.h"
+#include "voicecore/Occlusion.h"
 #include "voicecore/Spatial.h"
 #include "voicecore/Transmitter.h"
 
@@ -42,6 +43,8 @@ namespace voice
         void Connect(const voicecore::ClientConfig& cc);
         void Disconnect(const char* why);
         void UpdateContext(const GameSnapshot& s);
+        void UpdateOcclusionCandidates(unsigned long long now);
+        void TraceOcclusion(const GameSnapshot& s);   // Hauptthread / main thread
         voicecore::SpeakerGain GainFor(uint32_t session);
 
         Config _cfg;
@@ -51,11 +54,15 @@ namespace voice
         voicecore::MumbleClient _client;
         voicecore::AudioMixer _mixer;
         voicecore::Transmitter _tx;
+        voicecore::OcclusionTracker _occ;
+        std::atomic<bool> _occOff{ false };     // DE: aus oder TraceLine defekt / off or TraceLine broken
+        unsigned long long _nextOccUpdate = 0;
 
         // DE: Von Audio-Thread und Worker genutzt (_posMutex). EN: used by audio thread and worker (_posMutex).
         std::mutex _posMutex;
         voicecore::spatial::Params _spatial;
         std::map<uint32_t, voicecore::spatial::Vec3> _speakerPos;   // WoW-Koordinaten / WoW coordinates
+        std::map<uint32_t, unsigned long long> _speakerSeen;         // letztes Audiopaket / last audio packet
         voicecore::spatial::Listener _listener;
         float _myPos[3] = {};
         bool _hasMyPos = false;

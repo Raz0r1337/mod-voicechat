@@ -16,7 +16,7 @@
 
 The shared protocol code (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtocol.h`) is used by both `voice.dll` and the AzerothCore module.
 
-## Phase 5 status
+## Phase 6 status
 
 **What works:**
 - **Transmission:** microphone → Opus → Murmur → other clients → speakers.
@@ -26,13 +26,16 @@ The shared protocol code (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtoc
   - If the server runs `mod-voicechat`, the Murmur address, name, channel (map/instance) and permissions come from there.
   - The Mumble session is bound to the character via a one-time nonce.
   - Without an answer (server without the module), everything runs standalone as in phase 4.
-- **Party/raid:** members are always fully audible, even on other maps or in instances. Their position only sets the direction: never quieter, no rear damping, later no occlusion. Members on another map sound centred.
+- **Party/raid:** members are always fully audible, even on other maps or in instances. Their position only sets the direction: never quieter, no rear damping, no occlusion. Members on another map sound centred.
 - **Strangers:** they are only audible when the server reports them as "in range", and they get quieter with distance.
+- **Occlusion:** walls, buildings and terrain between you and a stranger make their voice quieter and duller. Adjustable in `voice.ini [Occlusion]` (level and low-pass at full occlusion).
+  - Each speaker gets 3 line-of-sight rays (centre, left, right) via WoW's own `TraceLine`. The share of blocked rays gives a soft transition at corners.
+  - The rays run on the main thread with a fixed budget per frame and are refreshed about every 100 ms. Transitions are smoothed (~120 ms).
+  - Group members are never affected.
 - **Sending:** audio only goes to "near + group" (Mumble whisper). This saves bandwidth, and a manipulated client cannot force audio on anyone.
 - **No code patch:** game data and packets are processed on the WoW main thread (subclassed WoW window). For the server packets, only a handler is put into WoW's handler table; other packets go to the original handler.
 
 **Deliberately not included yet:**
-- **No walls/occlusion** (phase 6).
 - **Own PTT key:** the key is set in `voice.ini`; WoW key bindings and the Blizzard voice UI follow in phase 7.
 - **Addresses only checked statically:** all client addresses are in `voice/WowApi.h`. They were **checked statically** against the original 12340 exe (disassembly: handler table `conn+0x53C`, call `cdecl(param, opcode, time, CDataStore*)`), but **not at runtime** yet.
 
@@ -45,7 +48,7 @@ The shared protocol code (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtoc
   - Different channels do not hear each other.
   - Unbound users are kicked.
   - Whispering across channel borders (group) arrives.
-- **Unit tests:** distance, panning, rotation, behind/front, occlusion formula, group mode (never quieter), coordinates and click-free volume ramps.
+- **Unit tests:** distance, panning, rotation, behind/front, occlusion formula, group mode (never quieter), coordinates and click-free volume ramps. Plus the occlusion tracker against a test wall: full, free, partial (1/3), ray budget, smoothing and cleanup.
 - **Builds:** `voice.dll` builds cleanly as a 32-bit DLL, and the AzerothCore module compiles without warnings.
 - **Nothing has been tested inside WoW itself.**
 
@@ -76,7 +79,7 @@ The shared protocol code (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtoc
 ## Test checklist (please report back `voice.log` and the worldserver log)
 
 - [ ] Does WoW start normally, with and without `voice.dll`?
-- [ ] Is `voice.dll started (phase 5)` in `voice.log`?
+- [ ] Is `voice.dll started (phase 6)` in `voice.log`?
 - [ ] After entering the world, is `ServerLink: SMSG handler installed` in the log?
 - [ ] **With the module:** do these lines appear in the log, in order?
   - [ ] `server config: <host>:<port> as '<name>'`
@@ -89,6 +92,7 @@ The shared protocol code (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtoc
 - [ ] Is `UDP active` in the log?
 - [ ] **Strangers:** do two clients (not grouped) hear each other? Does the voice get quieter when walking away, and is it silent from about 40 yd? Does the voice come from the right side?
 - [ ] **Group:** is a group member still fully audible at 200 yd and from the right direction? Can you also hear them when they are in an instance or on another continent?
+- [ ] **Occlusion:** does a stranger behind a house wall or a hill become quieter and duller, and does the sound come back softly when they step out? Does a group member behind the wall stay unchanged? If `occlusion: access violation` shows up in the log, the `TraceLine` address does not match, so please report it.
 - [ ] Does the context change when entering an instance, and do players in different instances of the same dungeon ID not hear each other (unless in the same group)?
 - [ ] Do `.voice status`, `.voice mute <name>`, `.voice unmute <name>` and `.voice kick <name>` work?
 - [ ] On logout, is the connection closed (`disconnect: left world`) and the microphone released?

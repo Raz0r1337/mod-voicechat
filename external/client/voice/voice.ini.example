@@ -1,6 +1,6 @@
 ; ============================================================
 ;  mod-voicechat - voice.ini (neben Wow.exe / next to Wow.exe)
-;  Phase 5: Server-Integration (mod-voicechat) / server integration
+;  Phase 6: Server-Integration + Occlusion (mod-voicechat) / server integration + occlusion
 ; ============================================================
 
 [Server]
@@ -52,6 +52,21 @@ MaxDistance=40
 ListenerMode=camera
 ; DE: 1 = Sprecher ohne Position (z. B. Desktop-Mumble, andere Map) trotzdem hoeren. EN: 1 = still hear speakers without position.
 HearWithoutPosition=0
+
+[Occlusion]
+; DE: Waende/Gelaende zwischen dir und einem Fremden daempfen die Stimme (WoW TraceLine, 3 Strahlen je Sprecher).
+;     Gruppen-/Raidmitglieder sind nie betroffen.
+; EN: walls/terrain between you and a stranger muffle the voice (WoW TraceLine, 3 rays per speaker).
+;     Party/raid members are never affected.
+Enabled=1
+; DE: Pegel bei voller Verdeckung (0..1) und Tiefpass dann (Hz). EN: level when fully occluded (0..1) and low-pass then (Hz).
+Gain=0.35
+LowpassHz=1000
+; DE: TraceLine-Flags (0x100111 = Gelaende + Gebaeude + Modelle, wie WoW selbst). EN: TraceLine flags (as WoW itself uses).
+Flags=0x100111
+; DE: Kopfhoehe ueber den Fuessen (Yards) und Strahlbudget pro Frame. EN: head height above the feet (yards) and ray budget per frame.
+HeadHeight=1.5
+RaysPerTick=9
 
 [Debug]
 ; DE: schreibt voice.log neben Wow.exe. EN: writes voice.log next to Wow.exe.

@@ -39,6 +39,14 @@ namespace voice
         std::string listenerMode = "camera";   // camera | character
         bool hearWithoutPosition = false;
 
+        // [Occlusion]
+        bool occlusion = true;
+        float occlusionGain = 0.35f;     // Pegel bei voller Verdeckung / level when fully occluded
+        float occlusionLowpassHz = 1000.0f;
+        uint32_t occlusionFlags = 0x100111;
+        float occlusionHeadHeight = 1.5f;
+        int occlusionRaysPerTick = 9;
+
         // [Debug]
         bool log = true;
 

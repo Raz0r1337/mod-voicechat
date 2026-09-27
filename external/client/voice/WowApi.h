@@ -33,7 +33,8 @@ namespace wow
         constexpr uintptr_t DataStorePutInt8      = 0x0047AFE0;  // __thiscall(uint8)                       (Phase 5)
         constexpr uintptr_t DataStorePutInt32     = 0x0047B0A0;  // __thiscall(uint32)                      (Phase 5)
         constexpr uintptr_t DataStoreRelease      = 0x00403880;  // __thiscall                              (Phase 5)
-        constexpr uintptr_t TraceLine             = 0x007A3B70;  // bool __cdecl(start*, end*, hit*, dist*, flags, 0) (Phase 6)
+        constexpr uintptr_t TraceLine             = 0x007A3B70;  // bool __cdecl(start*, end*, hit*|0, float* fraction, flags, 0)
+        constexpr uint32_t  TraceLosFlags         = 0x00100111;  // wie WoWs eigener Aufruf 0x77F550 / as WoW's own call at 0x77F550
         constexpr uintptr_t FrameScriptRegister   = 0x00817F90;  // __cdecl(name, fn)                       (Phase 7)
         constexpr uintptr_t FrameScriptExecute    = 0x00819210;  // __cdecl(code, source, 0)                (Phase 7)
         constexpr uintptr_t FrameScriptSignal     = 0x0081B530;  // __cdecl(eventId, fmt, ...)              (Phase 7)
@@ -58,6 +59,11 @@ namespace wow
     uint64_t ActivePlayerGuid();
     bool PlayerPosition(C3Vector& pos, float& facing);
     bool CameraPosition(C3Vector& pos);
+    // DE: Sichtlinie (Phase 6). true = Strahl trifft Geometrie. Laut Disassembly: fraction ein 1.0,
+    //     aus Trefferanteil; hit = start + (end - start) * fraction.
+    // EN: line of sight (phase 6). true = ray hits geometry. Per disassembly: fraction in 1.0,
+    //     out hit share; hit = start + (end - start) * fraction.
+    bool TraceLine(const C3Vector& start, const C3Vector& end, uint32_t flags);
 
     // DE: Netzwerk (nur Hauptthread). Handler-Aufruf laut Dispatcher 0x631FE0:
     //     cdecl(param, opcode, time, CDataStore*), Lesezeiger steht hinter dem Opcode.

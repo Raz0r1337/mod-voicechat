@@ -7,7 +7,8 @@ add_library(voicecore STATIC
     src/OpusCodec.cpp
     src/AudioMixer.cpp
     src/Transmitter.cpp
-    src/Spatial.cpp)
+    src/Spatial.cpp
+    src/Occlusion.cpp)
 
 target_include_directories(voicecore
     PUBLIC
