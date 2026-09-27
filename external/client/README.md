@@ -38,11 +38,11 @@ Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`, `src/shared/VoiceP
   - **Einstellungen:** Sie kommen aus dem Menü. „Voice-Chat aktivieren“ ist der Hauptschalter, dazu Mikrofon an/aus, Push-to-Talk oder Sprachaktivierung (mit Empfindlichkeit), die Push-to-Talk-Taste (auch mit Modifikatoren oder Maustaste 3–5), die Lautstärken für Mikrofon und Sprache sowie **Ein- und Ausgabegerät**. Die Gerätelisten im Menü sind die Geräte, die voice.dll tatsächlich nutzt (WASAPI). „Standard“ bedeutet das Windows-Standardgerät oder `InputDevice`/`OutputDevice` aus `voice.ini`. Ein Wechsel greift sofort, ohne Neuverbindung.
   - **Spielgeräusche absenken:** Solange jemand hörbar spricht, werden Ton, Musik und Umgebung weich auf die Stärke der Regler im Voice-Menü abgesenkt (Faktor auf deine normale Lautstärke). Das ist absturzsicher: Die Originalwerte stehen vorher in `voice.duck` und werden beim nächsten Start zurückgeschrieben. Abschaltbar mit `voice.ini [Ui] DuckGameSound=0`.
   - **Mikrofontest:** Aufnahme- und Abspielknopf im Voice-Menü samt Pegelanzeige (5 s aufnehmen, dann anhören, mit Mikrofon- und Sprachlautstärke aus dem Menü). Er funktioniert auch, bevor Voice verbunden ist.
+  - **Sprecherliste oben links:** Die originale Blizzard-Liste zeigt, wer gerade spricht: Gruppenmitglieder und hörbare Fremde, du selbst nicht. Die Namen blenden kurz nach dem Sprechen aus.
   - **Sprecher-Symbole:** Am Spielerrahmen und an den Gruppenrahmen blinkt das originale Lautsprecher-Symbol, wenn du oder ein Gruppenmitglied sprichst. Gruppenmitglieder mit Voice bekommen das Voice-Symbol. Technisch erweitert eine Lua-Bridge `UnitIsTalking`/`GetVoiceStatus` und liefert `VOICE_START`, `VOICE_STOP` und `VOICE_STATUS_UPDATE` an alle Frames, die sie registriert haben, also auch an Addons.
 - **Kein Code-Patch:** Spiel-Daten und Pakete werden im WoW-Hauptthread verarbeitet (gesubclasstes WoW-Fenster). Für die Serverpakete wird nur ein Handler in WoWs Handler-Tabelle eingetragen, fremde Pakete gehen an den Original-Handler.
 
 **Bewusst noch nicht enthalten:**
-- **Noch nicht aus dem WoW-Menü:** die Sprecherliste oben links (`VoiceChatTalkers`).
 - **Adressen nur statisch geprüft:** Alle Client-Adressen stehen in `voice/WowApi.h`. Sie sind an der originalen 12340-Exe **statisch geprüft** (Disassembly: Handler-Tabelle `conn+0x53C`, Aufruf `cdecl(param, opcode, time, CDataStore*)`), aber noch **nicht zur Laufzeit**.
 
 **Hier getestet:**
@@ -54,7 +54,7 @@ Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`, `src/shared/VoiceP
   - Verschiedene Channels hören sich nicht.
   - Ungebundene Nutzer werden gekickt.
   - Flüstern über Channel-Grenzen (Gruppe) kommt an.
-- **Lua-Bridge:** Mit Lua 5.1 wie in WoW (`tests/nativeui_test.sh`) werden Overrides, Event-Zustellung (auch nach einem fehlerhaften Handler), „keine Events ohne Änderung“ und das einmalige Eintragen des Menüs geprüft.
+- **Lua-Bridge:** Mit Lua 5.1 wie in WoW (`tests/nativeui_test.sh`) werden Overrides, Event-Zustellung (auch nach einem fehlerhaften Handler), die Sprecherliste, die Geräteliste, „keine Events ohne Änderung“ und das einmalige Eintragen des Menüs geprüft.
 - **Unit-Tests:** Entfernung, Panning, Drehung, hinten/vorne, Occlusion-Formel, Gruppen-Modus (nie leiser), Koordinaten und knackfreie Lautstärke-Rampen. Dazu der Mikrofontest (Aufnahme, Auto-Stopp, Wiedergabe, Pegel, Gain/Lautstärke), das Absenken der Spielgeräusche (Überblenden, Reglerbewegung, Ausloggen, Absturz) und der Occlusion-Tracker mit einer Test-Wand: voll, frei, teilweise (1/3), Strahlbudget, Glättung und Aufräumen.
 - **Builds:** `voice.dll` wird fehlerfrei als 32-Bit-DLL gebaut, und das AzerothCore-Modul kompiliert ohne Warnungen.
 - **In WoW selbst ist nichts getestet.**
@@ -107,6 +107,7 @@ Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`, `src/shared/VoiceP
   - [ ] Zeigen die Geräte-Menüs deine Mikrofone und Lautsprecher, und wechselt voice.dll bei Auswahl (Log: `audio devices changed in the voice menu`)?
   - [ ] Werden Ton, Musik und Umgebung leiser, solange jemand spricht (Regler „Ton/Musik/Umgebung“ im Voice-Menü)? Kommen sie danach wieder auf deine normalen Werte? Nach einem WoW-Absturz während jemand spricht: Stehen die Lautstärken beim nächsten Start wieder richtig (Log: `ducking: restored game volumes`)?
   - [ ] Nimmt der Mikrofontest im Voice-Menü auf, zeigt dabei den Pegel und spielt die Aufnahme ab?
+  - [ ] Erscheinen Sprechende oben links in der Sprecherliste (auch Fremde in Hörweite) und verschwinden kurz danach wieder?
   - [ ] Blinkt das Lautsprecher-Symbol am eigenen Rahmen und am Gruppenrahmen beim Sprechen?
   - [ ] Funktioniert das auch nach `/reload`, ohne dass *Voice* doppelt im Menü steht?
   - [ ] Startet WoWs alte Voice-Engine trotzdem? Das sieht man z. B. an einer Meldung „Voice-Chat nicht verfügbar“ oder daran, dass das Mikrofon doppelt belegt ist.

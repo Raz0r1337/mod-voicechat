@@ -120,5 +120,23 @@ check(refreshed == 1, "dropdown refreshed on change")
 run('MVC.SetDevices({"Mic A","Headset \\"B\\""},{"Speakers"})')
 check(refreshed == 1, "no refresh without change")
 
+-- 9) Sprecherliste oben links / talker list at the top left
+local plates = {}
+local talkers = frame({ VOICE_PLATE_START = true, VOICE_PLATE_STOP = true }, "talkers")
+talkers.GetScript = function(self, kind)
+  return function(self, ev, name, unit) table.insert(plates, ev .. ":" .. tostring(name) .. ":" .. tostring(unit)) end
+end
+table.insert(frames, talkers)
+run('MVC.Sync({["Bob"]=1},{["Bob"]=1},{["Bob"]=1,["Stranger"]=1})')
+local p = table.concat(plates, " ")
+check(p:find("VOICE_PLATE_START:Bob:party1") ~= nil, "plate start for group member with unit")
+check(p:find("VOICE_PLATE_START:Stranger:nil") ~= nil, "plate start for stranger without unit")
+plates = {}
+run('MVC.Sync({["Bob"]=1},{["Bob"]=1},{["Bob"]=1,["Stranger"]=1})')
+check(#plates == 0, "no plate events without change")
+run('MVC.Sync({},{},{})')
+p = table.concat(plates, " ")
+check(p:find("VOICE_PLATE_STOP:Bob:party1") ~= nil and p:find("VOICE_PLATE_STOP:Stranger:nil") ~= nil, "plate stop on reset")
+
 if fails == 0 then print("nativeui_test: all checks passed") end
 os.exit(fails == 0 and 0 or 1)

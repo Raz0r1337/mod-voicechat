@@ -49,7 +49,10 @@ namespace voice
     public:
         // DE: Worker. EN: worker.
         void SetActive(bool active);
-        void SetState(const std::set<std::string>& talking, const std::set<std::string>& voice);
+        // DE: talking/voice: ich + Gruppe (Rahmen-Symbole); plates: alle hoerbaren Sprecher ausser mir (Sprecherliste).
+        // EN: talking/voice: me + group (frame icons); plates: all audible speakers but me (talker list).
+        void SetState(const std::set<std::string>& talking, const std::set<std::string>& voice,
+                      const std::set<std::string>& plates);
         // DE: Geraeteliste fuer das Voice-Menue (Index 1..n, 0 = Standard). EN: device list for the voice menu.
         void SetDevices(const std::vector<std::string>& capture, const std::vector<std::string>& playback);
         WowVoiceSettings Settings();
@@ -60,7 +63,7 @@ namespace voice
     private:
         std::mutex _mutex;
         bool _active = false;
-        std::set<std::string> _talking, _voice;
+        std::set<std::string> _talking, _voice, _plates;
         std::vector<std::string> _capture, _playback;
         bool _dirty = true;
         WowVoiceSettings _settings;

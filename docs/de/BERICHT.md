@@ -289,7 +289,7 @@ Der Laufzeittest steht noch aus.
   - voice.dll registriert über `FrameScript_RegisterFunction` (0x817F90: `pushcclosure`, `pushstring`, `insert`, `rawset` in die Globals) eigene C-Funktionen unter Blizzards Namen: `VoiceChat_Record/StopRecording/Play/StopPlayingLoopbackSound`, `VoiceChat_Is{Recording,Playing}LoopbackSound` (liefert 0/1 als Zahl, wie das Menü erwartet) und `VoiceChat_GetCurrentMicrophoneSignalLevel` (0–100).
   - Lua-C-API: `lua_gettop` 0x84DBD0, `lua_tonumber` 0x84E030, `lua_pushnumber` 0x84E2A0.
   - Die Logik liegt in `voicecore::LoopbackTest`.
-- **Offen:** die Sprecherliste `VoiceChatTalkers` (braucht die Session-API).
+- **Sprecherliste (Phase 8d):** `VoiceChatTalkers` hängt nur an `VOICE_PLATE_START`/`VOICE_PLATE_STOP` (Name, Unit), eine Session-API ist nicht nötig. Die Lua-Bridge feuert sie für alle hörbaren Sprecher außer dir selbst (Gruppe mit Unit, Fremde ohne).
 
 ## 4. Codec
 

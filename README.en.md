@@ -19,7 +19,7 @@ Native 3D proximity voice for **World of Warcraft 3.3.5a (build 12340)** and **A
 - **Positional audio:** volume by distance, direction via stereo/3D, damping through walls and terrain (occlusion: quieter and duller, soft transition at corners)
 - **Separate worlds:** continents and every instance (e.g. Naxxramas #42 and #43) are isolated from each other
 - **Party/raid:** group members are always heard at full volume, even on other maps or in instances. Their position only sets the direction of the voice. Strangers are only heard within range, getting quieter with distance.
-- **Integration:** feels like the original WoW voice. Voice options menu under *Interface → Sound & Voice → Voice* (on/off, microphone, push-to-talk key, voice activation, volumes) and speaker icons on player and party frames.
+- **Integration:** feels like the original WoW voice. Voice options menu under *Interface → Sound & Voice → Voice* (on/off, microphone, push-to-talk key, voice activation, volumes, devices), plus microphone test, lowering game sounds, speaker icons on player and party frames and the talker list.
 
 ## Architecture at a glance
 

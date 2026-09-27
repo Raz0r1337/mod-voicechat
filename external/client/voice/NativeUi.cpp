@@ -18,7 +18,7 @@ namespace voice
         // EN: once per Lua state (again after /reload). Runs as secure code (taint 0).
         const char* kInstall = R"LUA(
 if not MVC then
-  MVC = { talking = {}, voice = {} }
+  MVC = { talking = {}, voice = {}, plates = {} }
   local origTalking, origStatus = UnitIsTalking, GetVoiceStatus
   UnitIsTalking = function(name, ...)
     if name and MVC.talking[name] then return 1 end
@@ -71,7 +71,8 @@ if not MVC then
       end
     end
   end
-  function MVC.Sync(talking, voice)
+  function MVC.Sync(talking, voice, plates)
+    plates = plates or {}
     local changed = false
     for n in pairs(voice) do if not MVC.voice[n] then changed = true end end
     for n in pairs(MVC.voice) do if not voice[n] then changed = true end end
@@ -90,6 +91,13 @@ if not MVC then
         local u = MVC.Unit(n)
         if u then MVC.Fire("VOICE_STOP", u) end
       end
+    end
+    -- DE: Sprecherliste oben links (alle hoerbaren Sprecher ausser mir). EN: talker list (all audible speakers but me).
+    for n in pairs(plates) do
+      if not MVC.plates[n] then MVC.plates[n] = 1 MVC.Fire("VOICE_PLATE_START", n, MVC.Unit(n)) end
+    end
+    for n in pairs(MVC.plates) do
+      if not plates[n] then MVC.plates[n] = nil MVC.Fire("VOICE_PLATE_STOP", n, MVC.Unit(n)) end
     end
   end
 end
@@ -173,12 +181,14 @@ end
         _active = active;
     }
 
-    void NativeUi::SetState(const std::set<std::string>& talking, const std::set<std::string>& voice)
+    void NativeUi::SetState(const std::set<std::string>& talking, const std::set<std::string>& voice,
+                            const std::set<std::string>& plates)
     {
         std::lock_guard<std::mutex> g(_mutex);
-        if (talking == _talking && voice == _voice) return;
+        if (talking == _talking && voice == _voice && plates == _plates) return;
         _talking = talking;
         _voice = voice;
+        _plates = plates;
         _dirty = true;
     }
 
@@ -211,13 +221,13 @@ end
         if (_broken) return;
 
         bool active, dirty;
-        std::set<std::string> talking, voice;
+        std::set<std::string> talking, voice, plates;
         std::vector<std::string> capture, playback;
         {
             std::lock_guard<std::mutex> g(_mutex);
             active = _active;
             dirty = active && _dirty;
-            if (active) { talking = _talking; voice = _voice; capture = _capture; playback = _playback; _dirty = false; }
+            if (active) { talking = _talking; voice = _voice; plates = _plates; capture = _capture; playback = _playback; _dirty = false; }
         }
         if (!active)
         {
@@ -225,7 +235,7 @@ end
             if (_wasActive)
             {
                 _wasActive = false;
-                static const char* reset = "if MVC then MVC.Sync({}, {}) end";
+                static const char* reset = "if MVC then MVC.Sync({}, {}, {}) end";
                 if (!wow::Guarded(&RunLua, const_cast<char*>(reset)))
                     _broken = true;
             }
@@ -282,7 +292,7 @@ end
         {
             _nextInstall = now + 5000;
             std::string code = std::string(kInstall) + "\nMVC.SetDevices(" + LuaList(capture) + "," + LuaList(playback) +
-                               ")\nMVC.Sync(" + LuaSet(talking) + "," + LuaSet(voice) + ")\n";
+                               ")\nMVC.Sync(" + LuaSet(talking) + "," + LuaSet(voice) + "," + LuaSet(plates) + ")\n";
             // DE: Mikrofontest-Funktionen (nach /reload neu registrieren). EN: microphone test functions (re-register after /reload).
             if (!wow::Guarded(&RegisterLoopbackFunctions, nullptr))
             {

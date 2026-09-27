@@ -554,7 +554,7 @@ namespace voice
     {
         // DE: Wer hat Voice, wer spricht (nur ich + Gruppe; Fremde haben keinen Rahmen).
         // EN: who has voice, who is talking (only me + group; strangers have no frame).
-        std::set<std::string> talking, voiceNames;
+        std::set<std::string> talking, voiceNames, plates;
         bool othersTalking = false;
         if (_nativeUi && _active && _bound && _client.State() == ClientState::Connected && !_charName.empty())
         {
@@ -582,10 +582,14 @@ namespace voice
             {
                 auto it = names.find(s);
                 if (group.count(s) && it != names.end()) talking.insert(it->second);
-                if (group.count(s) || nearby.count(s)) othersTalking = true;   // hoerbar / audible
+                if (group.count(s) || nearby.count(s))
+                {
+                    othersTalking = true;   // hoerbar / audible
+                    if (it != names.end() && s != _client.Session()) plates.insert(it->second);
+                }
             }
         }
-        _ui.SetState(talking, voiceNames);
+        _ui.SetState(talking, voiceNames, plates);
 
         // DE: Spielgeraeusche absenken, solange jemand anderes hoerbar spricht (Regler im Voice-Menue).
         // EN: lower game sounds while someone else is audibly talking (sliders in the voice menu).
