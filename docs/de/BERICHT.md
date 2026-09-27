@@ -16,7 +16,7 @@ Stand: 2026-09-27 · Ziel: WoW 3.3.5a (Build 12340) + AzerothCore + Murmur, nati
 - **Murmur macht kein 3D.** Es leitet Positionsdaten nur weiter, und zwar nur zwischen Nutzern mit identischem Kontext. Distanz, Richtung, Occlusion und Filter berechnet ohnehin der empfangende Client. Die sinnvolle Aufteilung ist also ein Hybrid: **Murmur für Transport, Routing und Isolation, der WoW-Client für die gesamte Audiowiedergabe im Raum**.
 - **Isolation nach Map und Instanz muss serverseitig passieren.** Der Client kennt seine Instanz-ID nicht, nur AzerothCore kennt sie. AzerothCore verbindet sich als privilegierter Mumble-Bot und verschiebt Nutzer in Channels nach dem Schema `Map/Instanz`.
 - Die Auth kommt ohne Ice-Authenticator aus. Die Bindung zwischen Mumble-Session und WoW-Charakter läuft über eine einmalige Nonce: WoW-Verbindung → AC, Mumble-TLS → Bot.
-- Das AzerothCore-Modul braucht **keine Core-Änderungen**. Nur optionale Moderationsfunktionen (Blizzard-Opcodes mit `STATUS_NEVER`) bräuchten einen kleinen Core-Patch.
+- Das AzerothCore-Modul braucht **keine Core-Änderungen**, alles läuft im Modul. Die Voice-Stubs im Core nutzen wir nicht, das Modul fängt die Pakete vorher per Hook ab. Moderation (Mute, Silence, Kick) läuft über MVCP und GM-Befehle statt über die gesperrten `STATUS_NEVER`-Opcodes.
 
 ---
 
@@ -262,7 +262,7 @@ Alle Lizenzen sind GPL-2.0-kompatibel.
 13. **Client-Änderungen:**
     - Wow.exe-Patch, der `voice.dll` lädt (wie AwesomeWotlk/WotLK-Extensions)
     - Hooks: `LoadFunctions` (Lua), `SetMessageHandler`/`ProcessMessage` (MVCP), Per-Frame-Hook, optional Unterdrücken der Comsat-Initialisierung ❓
-14. **AC-Änderungen:** keine Pflicht. Optional ein kleiner Core-Patch, der die Voice-CMSGs mit `STATUS_NEVER` freischaltet (Blizzard-Moderation: Silence, Voice-Ignore). Sauberer wäre ein Upstream-PR mit Hook oder Status-Änderung.
+14. **AC-Änderungen:** keine. Die Voice-Stubs des Cores bleiben unberührt, das Modul hakt sich per `CanPacketReceive` davor. Die `STATUS_NEVER`-Opcodes (Silence, Voice-Ignore) werden nicht gebraucht; Moderation läuft über MVCP und GM-Befehle.
 15. **Eigenständiges Modul:** alles Serverseitige. Client, Loader und Murmur-Konfiguration liegen unter `external/`.
 16. **RE-Risiken:**
     - Adressen gelten nur für 12340
@@ -313,7 +313,7 @@ mod-voicechat/                     ← direkt als modules/mod-voicechat klonbar
 - **Tests am Client** ab Phase 3b: Ich kann hier bauen und gegen Murmur testen, aber nicht WoW ausführen.
 - **Verifikation der ❓-Adressen** (Checkliste kommt mit Phase 3b; optional x32dbg/IDA).
 - **MPQ-Extrakte:** vorerst nicht nötig, die FrameXML ist öffentlich.
-- **Entscheidung:** eigener Loader-Patcher oder Einbindung in deinen bestehenden Exe-Patch.
+- ~~Entscheidung Loader~~: erledigt, `external/client/loader/` (eigene Sektion `.vcl`, nur Einstiegspunkt umgebogen; kompatibel mit St0ny's Patcher).
 
 ---
 
