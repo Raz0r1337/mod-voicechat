@@ -6,7 +6,8 @@ add_library(voicecore STATIC
     src/MumbleClient.cpp
     src/OpusCodec.cpp
     src/AudioMixer.cpp
-    src/Transmitter.cpp)
+    src/Transmitter.cpp
+    src/Spatial.cpp)
 
 target_include_directories(voicecore
     PUBLIC

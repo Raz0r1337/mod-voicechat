@@ -21,6 +21,7 @@ if(WIN32 AND NOT CMAKE_SIZEOF_VOID_P EQUAL 4)
 endif()
 
 option(VC_BUILD_CLI "Build voicecli test tool" ON)
+option(VC_BUILD_TESTS "Build unit tests" ON)
 option(VC_BUILD_DLL "Build voice.dll (Windows only)" ${WIN32})
 
 if(MSVC)
@@ -50,7 +51,8 @@ set(OPUS_STATIC_RUNTIME ON CACHE BOOL "" FORCE)      # MSVC /MT (Opus setzt die 
 
 FetchContent_Declare(mbedtls
     URL https://github.com/Mbed-TLS/mbedtls/releases/download/mbedtls-3.6.2/mbedtls-3.6.2.tar.bz2
-    URL_HASH SHA256=8b54fb9bcf4d5a7078028e0520acddefb7900b3e66fec7f7175bb5b7d85ccdca)
+    URL_HASH SHA256=8b54fb9bcf4d5a7078028e0520acddefb7900b3e66fec7f7175bb5b7d85ccdca
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE)
 set(ENABLE_PROGRAMS OFF CACHE BOOL "" FORCE)
 set(ENABLE_TESTING OFF CACHE BOOL "" FORCE)
 set(MBEDTLS_FATAL_WARNINGS OFF CACHE BOOL "" FORCE)
@@ -72,6 +74,13 @@ add_subdirectory(voicecore)
 
 if(VC_BUILD_CLI)
     add_subdirectory(tools/voicecli)
+endif()
+
+if(VC_BUILD_TESTS)
+    enable_testing()
+    add_executable(spatial_test tests/spatial_test.cpp)
+    target_link_libraries(spatial_test PRIVATE voicecore)
+    add_test(NAME spatial COMMAND spatial_test)
 endif()
 
 if(VC_BUILD_DLL)

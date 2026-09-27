@@ -6,6 +6,7 @@
 #include "voicecore/OpusCodec.h"
 
 #include <algorithm>
+#include <cmath>
 #include <deque>
 
 namespace voicecore
@@ -28,6 +29,9 @@ namespace voicecore
         bool ending = false;
         int plc = 0;
         bool talking = false;
+        bool hasGain = false;
+        float lastLeft = 0.0f, lastRight = 0.0f;
+        float lpState = 0.0f;
     };
 
     AudioMixer::AudioMixer() = default;
@@ -115,13 +119,23 @@ namespace voicecore
             }
 
             SpeakerGain gain = gainFn ? gainFn(kv.first) : SpeakerGain();
+            if (!s.hasGain) { s.lastLeft = gain.left; s.lastRight = gain.right; s.hasGain = true; }
+            // DE: Einpoliger Tiefpass (a = 1 -> aus). EN: one-pole low-pass (a = 1 -> off).
+            float a = gain.lowpassHz > 0.0f
+                ? 1.0f - std::exp(-2.0f * 3.14159265f * std::min(gain.lowpassHz, 20000.0f) / float(SAMPLE_RATE))
+                : 1.0f;
             size_t take = std::min(frames, s.pcm.size());
             for (size_t i = 0; i < take; ++i)
             {
                 float v = s.pcm[i] * _master;
-                out[2 * i] += v * gain.left;
-                out[2 * i + 1] += v * gain.right;
+                s.lpState += a * (v - s.lpState);
+                v = s.lpState;
+                // DE: Pegel ueber den Block rampen (kein Knacken bei Bewegung). EN: ramp level across the block (no clicks when moving).
+                float t = float(i + 1) / float(take);
+                out[2 * i] += v * (s.lastLeft + (gain.left - s.lastLeft) * t);
+                out[2 * i + 1] += v * (s.lastRight + (gain.right - s.lastRight) * t);
             }
+            if (take > 0) { s.lastLeft = gain.left; s.lastRight = gain.right; }
             s.pcm.erase(s.pcm.begin(), s.pcm.begin() + ptrdiff_t(take));
             s.talking = s.started || take > 0;
         }

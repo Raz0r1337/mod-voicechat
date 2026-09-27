@@ -23,6 +23,7 @@ namespace voicecore
     {
         float left = 1.0f;
         float right = 1.0f;
+        float lowpassHz = 0.0f;   // 0 = aus / off
     };
 
     class AudioMixer

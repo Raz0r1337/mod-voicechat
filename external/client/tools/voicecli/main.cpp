@@ -9,9 +9,11 @@
  *
  *   voicecli --user A --send-tone 440 --seconds 4
  *   voicecli --user B --expect-tone 440 --seconds 7 [--wav out.wav] [--tcp]
+ *   Positionen / positions (WoW-Yards): --pos x,y,z  --listen-pos x,y,z  --context wow335|0  --expect-silence
  */
 #include "voicecore/AudioMixer.h"
 #include "voicecore/MumbleClient.h"
+#include "voicecore/Spatial.h"
 #include "voicecore/Transmitter.h"
 
 #include <chrono>
@@ -20,6 +22,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <mutex>
 #include <string>
 #include <thread>
 #include <vector>
@@ -67,7 +70,11 @@ int main(int argc, char** argv)
     ClientConfig cfg;
     cfg.username = "voicecli";
     double sendTone = 0, expectTone = 0, seconds = 5;
-    std::string wav;
+    std::string wav, context;
+    bool hasPos = false, listenPositional = false, expectSilence = false;
+    spatial::Vec3 myPos;
+    spatial::Listener listener;
+    auto parseVec = [](const std::string& v) { spatial::Vec3 r; std::sscanf(v.c_str(), "%f,%f,%f", &r.x, &r.y, &r.z); return r; };
     for (int i = 1; i < argc; ++i)
     {
         std::string a = argv[i];
@@ -82,6 +89,10 @@ int main(int argc, char** argv)
         else if (a == "--expect-tone") expectTone = std::atof(next().c_str());
         else if (a == "--seconds") seconds = std::atof(next().c_str());
         else if (a == "--wav") wav = next();
+        else if (a == "--pos") { myPos = parseVec(next()); hasPos = true; }
+        else if (a == "--listen-pos") { listener.pos = parseVec(next()); listenPositional = true; }
+        else if (a == "--context") context = next();
+        else if (a == "--expect-silence") expectSilence = true;
         else { std::fprintf(stderr, "unknown argument %s\n", a.c_str()); return 2; }
     }
 
@@ -89,11 +100,18 @@ int main(int argc, char** argv)
     AudioMixer mixer;
     Transmitter tx;
     std::map<uint32_t, int> packetsFrom;
+    std::mutex posMutex;
+    std::map<uint32_t, spatial::Vec3> speakerPos;   // WoW-Koordinaten / WoW coordinates
 
     client.onLog = [&](const std::string& m) { std::printf("[%s] %s\n", cfg.username.c_str(), m.c_str()); std::fflush(stdout); };
     client.onDisconnected = [&](const std::string& r) { std::printf("[%s] disconnected: %s\n", cfg.username.c_str(), r.c_str()); };
     client.onAudio = [&](const MumbleProto::UdpAudio& a) {
         ++packetsFrom[a.senderSession];
+        {
+            std::lock_guard<std::mutex> g(posMutex);
+            if (a.hasPosition) speakerPos[a.senderSession] = spatial::MumbleToWow({ *a.pos[0], *a.pos[1], *a.pos[2] });
+            else speakerPos.erase(a.senderSession);
+        }
         mixer.Push(a.senderSession, a.frameNumber, a.opus, a.isTerminator);
     };
 
@@ -102,7 +120,18 @@ int main(int argc, char** argv)
         std::fprintf(stderr, "opus init failed\n");
         return 1;
     }
-    tx.onPacket = [&](const uint8_t* p, size_t n, bool term) { client.SendAudio(p, n, term, nullptr); };
+    spatial::Vec3 myMumble = spatial::WowToMumble(myPos);
+    float myPos3[3] = { myMumble.x, myMumble.y, myMumble.z };
+    tx.onPacket = [&](const uint8_t* p, size_t n, bool term) { client.SendAudio(p, n, term, hasPos ? myPos3 : nullptr); };
+    spatial::Params params;
+    AudioMixer::GainFn gainFn = nullptr;
+    if (listenPositional)
+        gainFn = [&](uint32_t session) {
+            std::lock_guard<std::mutex> g(posMutex);
+            auto it = speakerPos.find(session);
+            if (it == speakerPos.end()) { SpeakerGain z; z.left = z.right = 0.0f; return z; }   // ohne Position stumm / silent without position
+            return spatial::Compute(listener, it->second, params);
+        };
 
     client.Start(cfg);
     auto deadline = Clock::now() + std::chrono::seconds(10);
@@ -114,6 +143,7 @@ int main(int argc, char** argv)
         return 1;
     }
 
+    if (!context.empty()) client.SetPluginContext(context, "");
     if (sendTone > 0) std::this_thread::sleep_for(std::chrono::milliseconds(1000));   // Gegenstelle abwarten / wait for peer
     tx.SetMode(sendTone > 0 ? TransmitMode::Continuous : TransmitMode::PushToTalk);
 
@@ -133,7 +163,7 @@ int main(int argc, char** argv)
             tx.PushPcm(frame.data(), frame.size());
         }
 
-        mixer.Mix(mix.data(), FRAME_SAMPLES, nullptr);
+        mixer.Mix(mix.data(), FRAME_SAMPLES, gainFn);
         double e = 0;
         for (int i = 0; i < FRAME_SAMPLES; ++i) { mono[size_t(i)] = mix[size_t(2 * i)]; e += double(mono[size_t(i)]) * mono[size_t(i)]; }
         double rms = std::sqrt(e / FRAME_SAMPLES);
@@ -155,6 +185,14 @@ int main(int argc, char** argv)
     if (!wav.empty()) WriteWav(wav, record);
     client.Stop();
 
+    if (expectSilence)
+    {
+        int received = 0;
+        for (auto& kv : packetsFrom) received += kv.second;
+        bool ok = received >= 50 && loudFrames == 0;   // Pakete kamen an, aber stumm / packets arrived, but silent
+        std::printf("[%s] %s: %d packets received, %d loud frames\n", cfg.username.c_str(), ok ? "PASS" : "FAIL", received, loudFrames);
+        return ok ? 0 : 1;
+    }
     if (expectTone > 0)
     {
         bool ok = toneFrames >= 50;   // >= 1 s sauberer Ton / clean tone

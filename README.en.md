@@ -58,7 +58,7 @@ mod-voicechat/          ← clone into AzerothCore as modules/mod-voicechat
 | 1 | Research | ✅ |
 | 2 | Architecture | ✅ |
 | 3 | Proof of concept: client A ↔ Murmur ↔ client B with Opus ([client docs](external/client/README.en.md)) | 🧪 built, awaiting test in WoW |
-| 4 | Positional audio (X/Y/Z, orientation, distance, direction) | – |
+| 4 | Positional audio (X/Y/Z, orientation, distance, direction) | 🧪 built, awaiting test in WoW |
 | 5 | AzerothCore integration (login/logout, map/instance, permissions) | – |
 | 6 | Occlusion (raycast, attenuation, low-pass) | – |
 | 7 | Native Blizzard voice UI | – |

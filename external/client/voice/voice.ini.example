@@ -1,6 +1,6 @@
 ; ============================================================
 ;  mod-voicechat - voice.ini (neben Wow.exe / next to Wow.exe)
-;  Phase 3: einfacher Voice-Chat ohne Positionen / plain voice without positions
+;  Phase 4: Positional Voice (Entfernung + Richtung, Trennung nach Map) / distance + direction, map isolation
 ; ============================================================
 
 [Server]
@@ -36,11 +36,15 @@ Bitrate=32000
 InputDevice=
 OutputDevice=
 
-[Wow]
-; DE: HYPOTHESEN fuer Build 12340 (aus wow3.dll). Nur aendern, wenn die Welt-Erkennung nicht klappt.
-; EN: HYPOTHESES for build 12340 (from wow3.dll). Only change if in-world detection fails.
-InWorldAddress=0x00BD0792
-NameAddress=0x00C79D18
+[Spatial]
+; DE: bis MinDistance volle Lautstaerke, ab MaxDistance stumm (Yards). EN: full volume up to MinDistance, silent from MaxDistance (yards).
+MinDistance=3
+MaxDistance=40
+; DE: camera = Richtung aus Kamerasicht (3rd Person), character = Blickrichtung des Charakters.
+; EN: camera = direction from the camera view (3rd person), character = the character's facing.
+ListenerMode=camera
+; DE: 1 = Sprecher ohne Position (z. B. Desktop-Mumble, andere Map) trotzdem hoeren. EN: 1 = still hear speakers without position.
+HearWithoutPosition=0
 
 [Debug]
 ; DE: schreibt voice.log neben Wow.exe. EN: writes voice.log next to Wow.exe.
