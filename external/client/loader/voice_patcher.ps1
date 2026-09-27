@@ -22,13 +22,12 @@ if (-not (Test-Path -LiteralPath $Path)) {
 $full = (Resolve-Path -LiteralPath $Path).Path
 
 try {
-    $orig = [System.IO.File]::ReadAllBytes($full)
-    $new = Add-VoiceLoader -Image $orig -DllName $DllName
-    if ($new.Length -eq $orig.Length) { exit 0 }   # bereits gepatcht / already patched
+    $bytes = [System.IO.File]::ReadAllBytes($full)
+    if (-not (Add-VoiceLoader -Image $bytes -DllName $DllName)) { exit 0 }   # bereits gepatcht / already patched
 
     $bak = "$full.voice.BAK"
     if (-not (Test-Path -LiteralPath $bak)) { Copy-Item -LiteralPath $full -Destination $bak }
-    [System.IO.File]::WriteAllBytes($full, $new)
+    [System.IO.File]::WriteAllBytes($full, $bytes)
     Write-Host "  [OK] $DllName wird beim Start geladen / is loaded at startup. Backup: $bak"
     exit 0
 }
