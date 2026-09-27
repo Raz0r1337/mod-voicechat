@@ -24,7 +24,11 @@ option(VC_BUILD_CLI "Build voicecli test tool" ON)
 option(VC_BUILD_DLL "Build voice.dll (Windows only)" ${WIN32})
 
 if(MSVC)
-    # DE: statische Laufzeit -> keine VC-Redist beim Spieler. EN: static runtime -> no VC redist needed
+    # DE: statische Laufzeit -> keine VC-Redist beim Spieler. Die Policy-Vorgabe sorgt dafuer,
+    #     dass auch Opus/mbedTLS (alte cmake_minimum_required) mit /MT gebaut werden.
+    # EN: static runtime -> no VC redist needed. The policy default makes sure that
+    #     Opus/mbedTLS (old cmake_minimum_required) are built with /MT as well.
+    set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
     set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
 endif()
 
