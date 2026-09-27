@@ -1,0 +1,47 @@
+; ============================================================
+;  mod-voicechat - voice.ini (neben Wow.exe / next to Wow.exe)
+;  Phase 3: einfacher Voice-Chat ohne Positionen / plain voice without positions
+; ============================================================
+
+[Server]
+; DE: Murmur-Server. EN: Murmur server.
+Host=127.0.0.1
+Port=64738
+Password=
+; DE: optional SHA-256 des Server-Zertifikats (steht nach dem ersten Verbinden in voice.log)
+; EN: optional SHA-256 of the server certificate (logged in voice.log after the first connect)
+CertSha256=
+; DE: 1 = kein UDP, alles ueber TCP. EN: 1 = no UDP, everything via TCP.
+ForceTcp=0
+
+[Player]
+; DE: leer = Charaktername. EN: empty = character name.
+Username=
+; DE: 1 = nur in der Welt verbinden, beim Logout trennen. 0 = sofort verbinden (braucht Username).
+; EN: 1 = connect only while in the world, disconnect on logout. 0 = connect right away (needs Username).
+AutoConnectInWorld=1
+
+[Audio]
+; ptt | vad | continuous
+Mode=ptt
+; DE: Taste: CAPSLOCK, F1..F24, A..Z, 0..9, LSHIFT, LCTRL, LALT, MOUSE4, MOUSE5, SPACE, TAB oder 0x..
+; EN: key: CAPSLOCK, F1..F24, A..Z, 0..9, LSHIFT, LCTRL, LALT, MOUSE4, MOUSE5, SPACE, TAB or 0x..
+PushToTalkKey=CAPSLOCK
+; DE: Schwelle fuer Sprachaktivierung (0..1). EN: voice activation threshold (0..1).
+VadThreshold=0.02
+InputGain=1.0
+OutputVolume=1.0
+Bitrate=32000
+; DE: Teil des Geraetenamens, leer = Windows-Standard. EN: part of the device name, empty = Windows default.
+InputDevice=
+OutputDevice=
+
+[Wow]
+; DE: HYPOTHESEN fuer Build 12340 (aus wow3.dll). Nur aendern, wenn die Welt-Erkennung nicht klappt.
+; EN: HYPOTHESES for build 12340 (from wow3.dll). Only change if in-world detection fails.
+InWorldAddress=0x00BD0792
+NameAddress=0x00C79D18
+
+[Debug]
+; DE: schreibt voice.log neben Wow.exe. EN: writes voice.log next to Wow.exe.
+Log=1
