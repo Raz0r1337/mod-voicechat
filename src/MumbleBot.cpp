@@ -52,6 +52,7 @@ namespace VoiceChat
         asio::ssl::context ssl{ asio::ssl::context::tls_client };
         std::unique_ptr<asio::ssl::stream<tcp::socket>> stream;
         asio::steady_timer pingTimer{ io }, reconnectTimer{ io }, maintTimer{ io };
+        unsigned reconnectDelay = 5;   // Sekunden / seconds
 
         std::deque<std::vector<uint8_t>> writeQueue;
         bool writing = false;
@@ -159,7 +160,10 @@ namespace VoiceChat
             Log("bot: " + reason);
             if (wasConnected) Emit({ Event::Disconnected, 0, "", reason });
             if (stopping) return;
-            reconnectTimer.expires_after(std::chrono::seconds(5));
+            // DE: Backoff 5..60 s, damit Murmurs Autoban die Worldserver-IP nie sperrt.
+            // EN: backoff 5..60 s so that Murmur's autoban never bans the worldserver IP.
+            reconnectTimer.expires_after(std::chrono::seconds(reconnectDelay));
+            reconnectDelay = std::min(reconnectDelay * 2, 60u);
             reconnectTimer.async_wait([this](const boost::system::error_code& ec) { if (!ec) Connect(); });
         }
 
@@ -268,6 +272,7 @@ namespace VoiceChat
                     synced = true;
                     connected = true;
                     Log("bot: connected, session " + std::to_string(s.session));
+                    reconnectDelay = 5;
                     Emit({ Event::Connected, s.session, "", "" });
                     for (auto& u : users)
                         if (u.first != s.session) Emit({ Event::UserJoined, u.first, u.second.first, "" });

@@ -65,3 +65,5 @@ Du musst in Murmur nichts von Hand anlegen. Der Bot des Moduls meldet sich als `
 Mumble-Nutzer ohne Bindung an einen Charakter werden nach `Voice.BindTimeoutSeconds` gekickt. Ausnahmen (z. B. Admins mit normalem Mumble-Client) trägst du in `Voice.AllowedExternalUsers` ein.
 
 **Rate-Limits:** Murmur verwirft zu schnelle Channel-, ACL- und Text-Nachrichten ohne Rückmeldung (`messagelimit`/`messageburst`). Der Bot drosselt sich deshalb selbst (`Voice.Bot.MessageRate`/`MessageBurst`). Setzt du die Murmur-Werte kleiner als die Vorgabe, musst du die Bot-Werte ebenfalls senken.
+
+**Autoban:** Murmur sperrt eine IP standardmäßig nach 10 Verbindungen in 120 s, erfolgreiche Anmeldungen eingeschlossen. Spieler hinter einer gemeinsamen IP (LAN, NAT) würden so gesperrt. Die Vorlage setzt deshalb `autobanSuccessfulConnections=false`. Der Bot verbindet sich nach Fehlern mit Backoff (5 s bis 60 s) neu und sperrt sich damit nicht selbst aus.

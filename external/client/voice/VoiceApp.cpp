@@ -21,6 +21,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <iterator>
 
 using namespace voicecore;
 

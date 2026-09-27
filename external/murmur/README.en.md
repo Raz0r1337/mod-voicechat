@@ -65,3 +65,5 @@ You do not have to create anything in Murmur by hand. The module's bot logs in a
 Mumble users without a binding to a character are kicked after `Voice.BindTimeoutSeconds`. Put exceptions (e.g. admins with a regular Mumble client) into `Voice.AllowedExternalUsers`.
 
 **Rate limits:** Murmur silently drops channel, ACL and text messages that come too fast (`messagelimit`/`messageburst`). The bot therefore throttles itself (`Voice.Bot.MessageRate`/`MessageBurst`). If you set the Murmur values lower than the defaults, lower the bot values as well.
+
+**Autoban:** by default Murmur bans an IP after 10 connections within 120 s, successful logins included. Players behind a shared IP (LAN, NAT) would get banned this way. The template therefore sets `autobanSuccessfulConnections=false`. After errors, the bot reconnects with backoff (5 s to 60 s), so it never locks itself out.

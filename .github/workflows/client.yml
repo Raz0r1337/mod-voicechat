@@ -28,7 +28,8 @@ jobs:
       - name: Start test Murmur
         run: |
           mkdir -p /tmp/murmur
-          printf 'database=/tmp/murmur/murmur.sqlite\nhost=127.0.0.1\nport=64738\nusers=100\nopusthreshold=0\n' > /tmp/murmur/murmur.ini
+          # DE/EN: autobanAttempts=0 - die Tests bauen viele Verbindungen von 127.0.0.1 auf / tests open many connections from 127.0.0.1
+          printf 'database=/tmp/murmur/murmur.sqlite\nhost=127.0.0.1\nport=64738\nusers=100\nopusthreshold=0\nautobanAttempts=0\n' > /tmp/murmur/murmur.ini
           mumble-server -ini /tmp/murmur/murmur.ini -supw ci-superuser
           mumble-server -ini /tmp/murmur/murmur.ini -fg > /tmp/murmur/stdout.log 2>&1 &
           sleep 3

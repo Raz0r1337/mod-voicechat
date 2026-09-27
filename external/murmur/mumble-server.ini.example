@@ -39,6 +39,9 @@ messagelimit=1
 autobanAttempts=10
 autobanTimeframe=120
 autobanTime=300
+; DE: Erfolgreiche Anmeldungen nicht zaehlen (Spieler hinter einer gemeinsamen IP, Reconnects nach Map-/Serverwechsel).
+; EN: do not count successful logins (players behind a shared IP, reconnects after map/server changes).
+autobanSuccessfulConnections=false
 
 ; DE: Kein Client-Zertifikat noetig (Phase 3). EN: no client certificate required (phase 3).
 certrequired=false
