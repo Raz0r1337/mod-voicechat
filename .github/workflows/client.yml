@@ -1,0 +1,57 @@
+# mod-voicechat - client CI: Linux end-to-end test against Murmur + Win32 build of voice.dll
+name: client
+
+on:
+  push:
+    paths: [ 'external/client/**', 'src/shared/**', '.github/workflows/client.yml' ]
+  pull_request:
+    paths: [ 'external/client/**', 'src/shared/**', '.github/workflows/client.yml' ]
+  workflow_dispatch:
+
+jobs:
+  linux-e2e:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Murmur
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mumble-server
+          sudo systemctl stop mumble-server || true
+
+      - name: Build voicecore + voicecli
+        run: |
+          cmake -S external/client -B build -DCMAKE_BUILD_TYPE=Release -DVC_BUILD_DLL=OFF
+          cmake --build build -j4
+
+      - name: Start test Murmur
+        run: |
+          mkdir -p /tmp/murmur
+          printf 'database=/tmp/murmur/murmur.sqlite\nhost=127.0.0.1\nport=64738\nusers=100\nopusthreshold=0\n' > /tmp/murmur/murmur.ini
+          mumble-server -ini /tmp/murmur/murmur.ini -fg > /tmp/murmur/stdout.log 2>&1 &
+          sleep 3
+
+      - name: End-to-end test (UDP + TCP tunnel)
+        working-directory: build
+        run: ../external/client/tests/e2e.sh tools/voicecli/voicecli
+
+  windows-win32:
+    runs-on: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build voice.dll (Win32)
+        run: |
+          cmake -S external/client -B build -A Win32
+          cmake --build build --config Release -j 4
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: voice-win32
+          path: |
+            build/voice/Release/voice.dll
+            build/tools/voicecli/Release/voicecli.exe
+            external/client/voice/voice.ini.example
+            external/client/loader/*.ps1
+            external/client/loader/*.bat

@@ -59,7 +59,7 @@ Folgt, sobald der erste Proof of Concept läuft (Phase 3). Geplant ist:
 |---|---|---|
 | 1 | Recherche | ✅ |
 | 2 | Architektur | ✅ |
-| 3 | Proof of Concept: Client A ↔ Murmur ↔ Client B mit Opus | ⏳ |
+| 3 | Proof of Concept: Client A ↔ Murmur ↔ Client B mit Opus ([Client-Doku](external/client/README.md)) | 🧪 gebaut, wartet auf Test in WoW |
 | 4 | Positional Audio (X/Y/Z, Orientierung, Distanz, Richtung) | – |
 | 5 | AzerothCore-Integration (Login/Logout, Map/Instanz, Rechte) | – |
 | 6 | Occlusion (Raycast, Dämpfung, Tiefpass) | – |

@@ -59,7 +59,7 @@ Coming once the first proof of concept works (phase 3). The plan:
 |---|---|---|
 | 1 | Research | ✅ |
 | 2 | Architecture | ✅ |
-| 3 | Proof of concept: client A ↔ Murmur ↔ client B with Opus | ⏳ |
+| 3 | Proof of concept: client A ↔ Murmur ↔ client B with Opus ([client docs](external/client/README.en.md)) | 🧪 built, awaiting test in WoW |
 | 4 | Positional audio (X/Y/Z, orientation, distance, direction) | – |
 | 5 | AzerothCore integration (login/logout, map/instance, permissions) | – |
 | 6 | Occlusion (raycast, attenuation, low-pass) | – |
