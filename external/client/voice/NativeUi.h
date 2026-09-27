@@ -39,6 +39,9 @@ namespace voice
         float vadSensitivity = 0.5f;    // VoiceActivationSensitivity (0 .. 1)
         int inputDevice = 0;            // Sound_VoiceChatInputDriverIndex (0 = Standard / default)
         int outputDevice = 0;           // Sound_VoiceChatOutputDriverIndex
+        float duckSound = 1.0f;         // ChatSoundVolume    (Faktor waehrend Voice / factor during voice)
+        float duckMusic = 1.0f;         // ChatMusicVolume
+        float duckAmbience = 1.0f;      // ChatAmbienceVolume
     };
 
     class NativeUi

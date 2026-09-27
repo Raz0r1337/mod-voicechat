@@ -8,7 +8,8 @@ add_library(voicecore STATIC
     src/AudioMixer.cpp
     src/Transmitter.cpp
     src/Spatial.cpp
-    src/Occlusion.cpp)
+    src/Occlusion.cpp
+    src/Ducking.cpp)
 
 target_include_directories(voicecore
     PUBLIC

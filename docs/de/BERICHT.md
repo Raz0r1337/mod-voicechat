@@ -284,7 +284,8 @@ Der Laufzeittest steht noch aus.
   - `VOICE_START`, `VOICE_STOP` und `VOICE_STATUS_UPDATE` gehen per `EnumerateFrames` + `IsEventRegistered` an alle Frames, jeweils in `pcall` und mit den alten globalen Variablen `this`/`event`/`arg1`.
 - **Absturzschutz und Tests:** Alle Aufrufe stehen unter SEH-Schutz. Die Lua-Bridge wird mit Lua 5.1 und nachgebauten WoW-Funktionen getestet.
 - **Geräteauswahl (Phase 8a):** Die Lua-Bridge ersetzt `Sound_ChatSystem_GetNum/…DriverNameByIndex` und `VoiceEnumerate/Select*Device` durch die WASAPI-Geräteliste von voice.dll (Index 0 = Standard). voice.dll liest `Sound_VoiceChatInput/OutputDriverIndex` und öffnet bei Änderung die Geräte neu.
-- **Offen:** Mikrofontest (Loopback der alten Engine), Absenken der Spielgeräusche und die Sprecherliste `VoiceChatTalkers` (braucht die Session-API).
+- **Spielgeräusche absenken (Phase 8b):** `CVar::Set` (0x7668C0, thiscall mit 5 Argumenten, wie Lua `SetCVar` bei 0x514CD2) blendet `Sound_SFX/Music/AmbienceVolume` auf „Original · Faktor“ (Regler `ChatSound/Music/AmbienceVolume`). Die Originalwerte stehen vorher in `voice.duck`, ein Absturz wird beim nächsten Start (auch im Login-Bildschirm) repariert. Die Logik liegt testbar in `voicecore::Ducking`.
+- **Offen:** Mikrofontest (Loopback der alten Engine) und die Sprecherliste `VoiceChatTalkers` (braucht die Session-API).
 
 ## 4. Codec
 

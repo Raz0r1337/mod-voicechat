@@ -6,6 +6,7 @@
 
 #include "AudioIO.h"
 #include "Config.h"
+#include "GameDucking.h"
 #include "GameThread.h"
 #include "NativeUi.h"
 #include "ServerLink.h"
@@ -57,6 +58,7 @@ namespace voice
         GameThread _game;
         ServerLink _server;
         NativeUi _ui;
+        GameDucking _duck;
         bool _nativeUi = false;          // DE: Server erlaubt + voice.ini will / server allows + voice.ini wants
         bool _userOff = false;           // DE: im WoW-Menue ausgeschaltet / switched off in the WoW menu
         std::string _pttBinding;

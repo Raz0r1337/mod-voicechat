@@ -82,6 +82,7 @@ namespace voice
         occlusionRaysPerTick = GetPrivateProfileIntA("Occlusion", "RaysPerTick", occlusionRaysPerTick, path.c_str());
 
         nativeUi = GetPrivateProfileIntA("Ui", "NativeUi", nativeUi, path.c_str()) != 0;
+        duckGameSound = GetPrivateProfileIntA("Ui", "DuckGameSound", duckGameSound, path.c_str()) != 0;
 
         log = GetPrivateProfileIntA("Debug", "Log", log, path.c_str()) != 0;
         return true;

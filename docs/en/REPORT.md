@@ -285,7 +285,8 @@ The runtime test is still pending.
   - `VOICE_START`, `VOICE_STOP` and `VOICE_STATUS_UPDATE` go to all frames via `EnumerateFrames` + `IsEventRegistered`, each in `pcall` and with the legacy globals `this`/`event`/`arg1`.
 - **Crash protection and tests:** all calls are under the SEH guard. The Lua bridge is tested with Lua 5.1 and mocked WoW functions.
 - **Device selection (phase 8a):** the Lua bridge replaces `Sound_ChatSystem_GetNum/…DriverNameByIndex` and `VoiceEnumerate/Select*Device` with voice.dll's WASAPI device list (index 0 = default). voice.dll reads `Sound_VoiceChatInput/OutputDriverIndex` and reopens the devices on change.
-- **Open:** microphone test (loopback of the old engine), lowering game sounds and the talker list `VoiceChatTalkers` (needs the session API).
+- **Lowering game sounds (phase 8b):** `CVar::Set` (0x7668C0, thiscall with 5 arguments, like Lua `SetCVar` at 0x514CD2) fades `Sound_SFX/Music/AmbienceVolume` to "original · factor" (sliders `ChatSound/Music/AmbienceVolume`). The original values are stored in `voice.duck` beforehand; a crash is repaired on the next start (also at the login screen). The logic lives, testable, in `voicecore::Ducking`.
+- **Open:** microphone test (loopback of the old engine) and the talker list `VoiceChatTalkers` (needs the session API).
 
 ## 4. Codec
 

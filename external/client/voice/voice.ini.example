@@ -78,6 +78,11 @@ RaysPerTick=9
 ;     the [Audio] values above (incl. devices; "Default" in the menu = InputDevice/OutputDevice above).
 ;     0 = voice.ini only.
 NativeUi=1
+; DE: 1 = Spielgeraeusche (Ton/Musik/Umgebung) absenken, solange jemand spricht - Staerke ueber die Regler im
+;     Voice-Menue (Faktor auf die normale Lautstaerke). Absturzsicher: voice.duck stellt die Werte beim naechsten Start her.
+; EN: 1 = lower game sounds (sound/music/ambience) while someone talks - strength via the sliders in the voice menu
+;     (factor on the normal volume). Crash-safe: voice.duck restores the values on the next start.
+DuckGameSound=1
 
 [Debug]
 ; DE: schreibt voice.log neben Wow.exe. EN: writes voice.log next to Wow.exe.

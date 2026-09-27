@@ -50,6 +50,7 @@ namespace voice
 
         // [Ui]
         bool nativeUi = true;            // Blizzard-Voice-UI nutzen, wenn der Server es erlaubt / use the Blizzard voice UI if the server allows
+        bool duckGameSound = true;       // Spielgeraeusche beim Sprechen absenken / lower game sounds while voice is active
 
         // [Debug]
         bool log = true;

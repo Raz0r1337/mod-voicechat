@@ -39,6 +39,7 @@ namespace wow
         constexpr uintptr_t FrameScriptExecute    = 0x00819210;  // void __cdecl(code, chunkName, taint) - 0 = sicher/secure (Phase 7)
         constexpr uintptr_t CVarLookup            = 0x00767460;  // CVar* __cdecl(name)  (aus Lua GetCVar 0x510040 / from Lua GetCVar)
         constexpr uint32_t  CVarStringValue       = 0x28;        // char* Wert / value
+        constexpr uintptr_t CVarSet               = 0x007668C0;  // __thiscall(CVar*, value, 1, 0, 0, 1) wie Lua SetCVar 0x514CD2 / like Lua SetCVar
         constexpr uintptr_t ServerVoiceAllowed    = 0x00BCF004;  // int, IsVoiceChatAllowedByServer (0x4FCCB0)
         constexpr uintptr_t FrameScriptSignal     = 0x0081B530;  // __cdecl(eventId, fmt, ...)              (ungenutzt / unused)
 
@@ -90,6 +91,7 @@ namespace wow
     // DE: Blizzard-UI (Phase 7), nur Hauptthread. EN: Blizzard UI (phase 7), main thread only.
     //     GetCVar: false = CVar unbekannt. EN: false = unknown CVar.
     bool GetCVar(const char* name, char* out, size_t outSize);
+    bool SetCVar(const char* name, const char* value);
     void LuaExecute(const char* code);
     void SetServerVoiceAllowed();   // DE: wie SMSG_FEATURE_SYSTEM_STATUS beim Login (still). EN: like at login (silent).
 

@@ -79,6 +79,17 @@ namespace wow
         return true;
     }
 
+    bool SetCVar(const char* name, const char* value)
+    {
+        void* cvar = reinterpret_cast<void*(__cdecl*)(const char*)>(addr::CVarLookup)(name);
+        if (!cvar) return false;
+        // DE: __thiscall als __fastcall (ecx = CVar, edx ungenutzt), 5 Stack-Argumente wie Lua SetCVar.
+        // EN: __thiscall as __fastcall (ecx = CVar, edx unused), 5 stack arguments like Lua SetCVar.
+        using Fn = void(__fastcall*)(void*, void*, const char*, int, int, int, int);
+        reinterpret_cast<Fn>(addr::CVarSet)(cvar, nullptr, value, 1, 0, 0, 1);
+        return true;
+    }
+
     void LuaExecute(const char* code)
     {
         reinterpret_cast<void(__cdecl*)(const char*, const char*, int)>(addr::FrameScriptExecute)(code, "mod-voicechat", 0);

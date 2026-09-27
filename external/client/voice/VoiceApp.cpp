@@ -101,6 +101,7 @@ namespace voice
         _game.onTick = [this](const GameSnapshot& s) {
             _server.MainTick(s.inWorld);
             _ui.MainTick(s.inWorld);
+            _duck.MainTick(s.inWorld);
             if (s.inWorld && !_occOff) TraceOcclusion(s);
         };
 
@@ -533,6 +534,7 @@ namespace voice
         // DE: Wer hat Voice, wer spricht (nur ich + Gruppe; Fremde haben keinen Rahmen).
         // EN: who has voice, who is talking (only me + group; strangers have no frame).
         std::set<std::string> talking, voiceNames;
+        bool othersTalking = false;
         if (_nativeUi && _active && _bound && _client.State() == ClientState::Connected && !_charName.empty())
         {
             voiceNames.insert(_charName);
@@ -550,13 +552,24 @@ namespace voice
                 auto it = names.find(s);
                 if (it != names.end()) voiceNames.insert(it->second);
             }
+            std::set<uint32_t> nearby;
+            {
+                std::lock_guard<std::mutex> g(_posMutex);
+                nearby = _nearby;
+            }
             for (uint32_t s : _mixer.Talking())
             {
                 auto it = names.find(s);
                 if (group.count(s) && it != names.end()) talking.insert(it->second);
+                if (group.count(s) || nearby.count(s)) othersTalking = true;   // hoerbar / audible
             }
         }
         _ui.SetState(talking, voiceNames);
+
+        // DE: Spielgeraeusche absenken, solange jemand anderes hoerbar spricht (Regler im Voice-Menue).
+        // EN: lower game sounds while someone else is audibly talking (sliders in the voice menu).
+        WowVoiceSettings ws = _nativeUi ? _ui.Settings() : WowVoiceSettings();
+        _duck.SetTarget(_cfg.duckGameSound && ws.valid && othersTalking, ws.duckSound, ws.duckMusic, ws.duckAmbience);
     }
 
     // ------------------------------------------------------------------------------------------

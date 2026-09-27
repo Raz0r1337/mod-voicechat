@@ -133,6 +133,7 @@ end
         struct CVarCtx
         {
             char enable[8], mic[8], mode[8], ptt[64], outVol[16], inVol[16], sens[16], inDev[8], outDev[8];
+            char duckSfx[16], duckMusic[16], duckAmb[16];
             bool ok;
         };
 
@@ -148,6 +149,9 @@ end
             wow::GetCVar("VoiceActivationSensitivity", c->sens, sizeof(c->sens));
             wow::GetCVar("Sound_VoiceChatInputDriverIndex", c->inDev, sizeof(c->inDev));
             wow::GetCVar("Sound_VoiceChatOutputDriverIndex", c->outDev, sizeof(c->outDev));
+            wow::GetCVar("ChatSoundVolume", c->duckSfx, sizeof(c->duckSfx));
+            wow::GetCVar("ChatMusicVolume", c->duckMusic, sizeof(c->duckMusic));
+            wow::GetCVar("ChatAmbienceVolume", c->duckAmb, sizeof(c->duckAmb));
         }
 
         void RunLua(void* p) { wow::LuaExecute(static_cast<const char*>(p)); }
@@ -252,6 +256,9 @@ end
                 s.vadSensitivity = ToFloat(c.sens, 0.5f, 0.0f, 1.0f);
                 s.inputDevice = std::atoi(c.inDev);
                 s.outputDevice = std::atoi(c.outDev);
+                s.duckSound = ToFloat(c.duckSfx, 1.0f, 0.0f, 1.0f);
+                s.duckMusic = ToFloat(c.duckMusic, 1.0f, 0.0f, 1.0f);
+                s.duckAmbience = ToFloat(c.duckAmb, 1.0f, 0.0f, 1.0f);
                 std::lock_guard<std::mutex> g(_mutex);
                 _settings = s;
             }

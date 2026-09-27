@@ -27,3 +27,8 @@ Thumbs.db
 *.ORI
 *.MPQ
 *.mpq
+
+# voice.dll Laufzeitdateien / runtime files
+voice.log
+voice.old.log
+voice.duck
