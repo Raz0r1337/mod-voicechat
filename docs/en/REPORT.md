@@ -259,6 +259,33 @@ Murmur gone         : client backoff reconnect; UI shows status (VOICE_STATUS_UP
 
 The runtime test is still pending.
 
+### 3.11 Phase 7 implementation: Blizzard voice UI
+
+**Findings (disassembly 12340):**
+
+| What | Result |
+|---|---|
+| `IsVoiceChatAllowedByServer()` (0x4FCCB0) | only reads the flag `[0xBCF004]` |
+| `IsVoiceChatEnabled()` (0x4FCBF0) | requires the CVar `EnableVoiceChat` (int at `+0x30`) and the server flag, plus `!VoiceIsDisabledByClient` |
+| `SMSG_FEATURE_SYSTEM_STATUS` (0x3C9) | sets `[0xBCF004]` silently, without an event. **WoW removes this handler when entering the world** (0x6B0BC0 = `ClearMessageHandler`), so the packet is ignored in game. |
+| `SMSG_VOICE_CHAT_STATUS` (0x3E3, handler 0x500240) | toggles the flag at runtime, fires a UI event and **starts WoW's own voice engine** (0x9868C0) once `EnableVoiceChat` and `EnableMicrophone` are set. That is why we do not use it. |
+| Lua `GetCVar` (0x510040) | calls `CVar::Lookup(name)` (0x767460, cdecl). The value string is at `+0x28`, bit 6 of `+0x1C` means "protected". |
+| `FrameScript_Execute` (0x819210) | `(code, chunkName, taint)`. WoW itself passes `0` for secure system code. |
+
+**Implementation:**
+- **Unlocking:**
+  - The server allows the UI via CONFIG field 11 (`Voice.BlizzardUi`).
+  - voice.dll then sets `[0xBCF004] = 1` on the main thread, exactly like the login packet, silently.
+  - Players without voice.dll see nothing.
+  - If Blizzard's `PLAYER_ENTERING_WORLD` code has already run, the Lua bridge adds the menu once (duplicate check via `AudioOptionsFrame.categoryList`) and initialises it like Blizzard does (`BlizzardOptionsPanel_OnEvent`).
+- **Settings:** voice.dll reads the CVars every 250 ms via `CVar::Lookup`. `EnableVoiceChat` = 0 disconnects; switching it back on triggers a fresh HELLO/CONFIG.
+- **Speaker icons:**
+  - The Lua bridge runs via `FrameScript_Execute` with taint 0, idempotently every 5 s or immediately on changes.
+  - It extends `UnitIsTalking` and `GetVoiceStatus`.
+  - `VOICE_START`, `VOICE_STOP` and `VOICE_STATUS_UPDATE` go to all frames via `EnumerateFrames` + `IsEventRegistered`, each in `pcall` and with the legacy globals `this`/`event`/`arg1`.
+- **Crash protection and tests:** all calls are under the SEH guard. The Lua bridge is tested with Lua 5.1 and mocked WoW functions.
+- **Open:** device selection, microphone test (loopback of the old engine), lowering game sounds and the talker list `VoiceChatTalkers` (needs the session API).
+
 ## 4. Codec
 
 1. **Which codec Comsat uses** is ❓ unknown. No reachable source documents it; static analysis (strings/signatures in Wow.exe) could determine it.
@@ -360,12 +387,12 @@ mod-voicechat/                     ← clone directly as modules/mod-voicechat
 | # | Hypothesis | Check |
 |---|---|---|
 | H1 | The Comsat codec is not Opus-compatible | irrelevant for the design; optional strings analysis of Wow.exe |
-| H2 | `EnableVoiceChat=1` without a roster starts no interfering capture | test on the client; hook Comsat init if needed |
+| H2 | `EnableVoiceChat=1` without a roster starts no interfering capture | important since phase 7: toggling it in the menu may start the old engine (further callers of 0x9868C0: 0x7DC7F9, 0x7E002D). Test on the client; intercept the engine start if needed |
 | H3 | Taking over a voice SMSG handler via `SetMessageHandler` (0x631FA0) is stable | PoC in phase 5 |
 | H4 | `TraceLine` at 0x7A3B70 with terrain/WMO/M2 flags | confirmed statically (see 3.7), runtime test pending |
 | H5 | Map ID address 0xBD088C vs. 0xAB63BC | in-game comparison (continent vs. instance) |
-| H6 | A `LoadFunctions` hook allows overriding the Blizzard voice Lua functions after /reload | phase 7 |
-| H7 | The Blizzard UI reacts correctly to self-fired `VOICE_*` events | phase 7 |
+| H6 | A `LoadFunctions` hook allows overriding the Blizzard voice Lua functions after /reload | not needed: the Lua bridge reinstalls itself idempotently every 5 s (see 3.11) |
+| H7 | The Blizzard UI reacts correctly to self-fired `VOICE_*` events | handler signatures checked against FrameXML, Lua test green, runtime test pending |
 
 ## 8. Sources
 

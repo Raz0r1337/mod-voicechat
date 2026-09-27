@@ -258,6 +258,33 @@ Murmur weg          : Client-Backoff-Reconnect; UI zeigt Status (VOICE_STATUS_UP
 
 Der Laufzeittest steht noch aus.
 
+### 3.11 Umsetzung Phase 7: Blizzard-Voice-Oberfläche
+
+**Befunde (Disassembly 12340):**
+
+| Was | Ergebnis |
+|---|---|
+| `IsVoiceChatAllowedByServer()` (0x4FCCB0) | liest nur das Flag `[0xBCF004]` |
+| `IsVoiceChatEnabled()` (0x4FCBF0) | verlangt die CVar `EnableVoiceChat` (Int bei `+0x30`) und das Server-Flag, dazu `!VoiceIsDisabledByClient` |
+| `SMSG_FEATURE_SYSTEM_STATUS` (0x3C9) | setzt `[0xBCF004]` still, ohne Event. **Beim Betreten der Welt entfernt WoW diesen Handler** (0x6B0BC0 = `ClearMessageHandler`), im Spiel wird das Paket also ignoriert. |
+| `SMSG_VOICE_CHAT_STATUS` (0x3E3, Handler 0x500240) | schaltet das Flag zur Laufzeit um, feuert ein UI-Event und **startet WoWs eigene Voice-Engine** (0x9868C0), sobald `EnableVoiceChat` und `EnableMicrophone` gesetzt sind. Wir nutzen es deshalb nicht. |
+| Lua `GetCVar` (0x510040) | ruft `CVar::Lookup(name)` (0x767460, cdecl) auf. Der Wert-String liegt bei `+0x28`, Bit 6 von `+0x1C` bedeutet „geschützt“. |
+| `FrameScript_Execute` (0x819210) | `(code, chunkName, taint)`. WoW selbst übergibt `0` für sicheren Systemcode. |
+
+**Umsetzung:**
+- **Freischalten:**
+  - Der Server erlaubt die Oberfläche per CONFIG-Feld 11 (`Voice.BlizzardUi`).
+  - voice.dll setzt dann im Hauptthread `[0xBCF004] = 1`, genau wie das Login-Paket, still.
+  - Spieler ohne voice.dll sehen nichts.
+  - Ist der Blizzard-Code bei `PLAYER_ENTERING_WORLD` schon durch, trägt die Lua-Bridge das Menü einmalig nach (Duplikatprüfung über `AudioOptionsFrame.categoryList`) und initialisiert es wie Blizzard (`BlizzardOptionsPanel_OnEvent`).
+- **Einstellungen:** voice.dll liest die CVars alle 250 ms über `CVar::Lookup`. `EnableVoiceChat` = 0 trennt die Verbindung, beim Wiedereinschalten folgt ein frisches HELLO/CONFIG.
+- **Sprecher-Symbole:**
+  - Die Lua-Bridge läuft über `FrameScript_Execute` mit taint 0, idempotent alle 5 s oder sofort bei Änderungen.
+  - Sie erweitert `UnitIsTalking` und `GetVoiceStatus`.
+  - `VOICE_START`, `VOICE_STOP` und `VOICE_STATUS_UPDATE` gehen per `EnumerateFrames` + `IsEventRegistered` an alle Frames, jeweils in `pcall` und mit den alten globalen Variablen `this`/`event`/`arg1`.
+- **Absturzschutz und Tests:** Alle Aufrufe stehen unter SEH-Schutz. Die Lua-Bridge wird mit Lua 5.1 und nachgebauten WoW-Funktionen getestet.
+- **Offen:** Geräteauswahl, Mikrofontest (Loopback der alten Engine), Absenken der Spielgeräusche und die Sprecherliste `VoiceChatTalkers` (braucht die Session-API).
+
 ## 4. Codec
 
 1. **Welcher Codec in Comsat steckt**, ist ❓ unbekannt. Er ist in keiner erreichbaren Quelle dokumentiert und ließe sich durch statische Analyse (Strings/Signaturen in Wow.exe) bestimmen.
@@ -359,12 +386,12 @@ mod-voicechat/                     ← direkt als modules/mod-voicechat klonbar
 | # | Hypothese | Prüfung |
 |---|---|---|
 | H1 | Der Comsat-Codec ist nicht Opus-kompatibel | irrelevant für das Design; optional Strings-Analyse von Wow.exe |
-| H2 | `EnableVoiceChat=1` ohne Roster startet keine störende Aufnahme | Test am Client; notfalls Comsat-Init hooken |
+| H2 | `EnableVoiceChat=1` ohne Roster startet keine störende Aufnahme | wichtig seit Phase 7: Das Umschalten im Menü kann die alte Engine starten (weitere Aufrufer von 0x9868C0: 0x7DC7F9, 0x7E002D). Test am Client; notfalls Engine-Start abfangen |
 | H3 | Die Handler-Übernahme eines Voice-SMSG über `SetMessageHandler` (0x631FA0) ist stabil | PoC in Phase 5 |
 | H4 | `TraceLine` bei 0x7A3B70 mit Terrain-/WMO-/M2-Flags | statisch bestätigt (siehe 3.7), Laufzeittest steht aus |
 | H5 | Map-ID-Adresse 0xBD088C vs. 0xAB63BC | Abgleich im Spiel (Kontinent vs. Instanz) |
-| H6 | `LoadFunctions`-Hook erlaubt das Überschreiben der Blizzard-Voice-Lua-Funktionen nach /reload | Phase 7 |
-| H7 | Das Blizzard-UI reagiert korrekt auf selbst ausgelöste `VOICE_*`-Events | Phase 7 |
+| H6 | `LoadFunctions`-Hook erlaubt das Überschreiben der Blizzard-Voice-Lua-Funktionen nach /reload | nicht nötig: Die Lua-Bridge installiert sich alle 5 s idempotent neu (siehe 3.11) |
+| H7 | Das Blizzard-UI reagiert korrekt auf selbst ausgelöste `VOICE_*`-Events | Handler-Signaturen aus der FrameXML geprüft, Lua-Test grün, Laufzeittest steht aus |
 
 ## 8. Quellen
 

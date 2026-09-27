@@ -35,9 +35,12 @@ namespace wow
         constexpr uintptr_t DataStoreRelease      = 0x00403880;  // __thiscall                              (Phase 5)
         constexpr uintptr_t TraceLine             = 0x007A3B70;  // bool __cdecl(start*, end*, hit*|0, float* fraction, flags, 0)
         constexpr uint32_t  TraceLosFlags         = 0x00100111;  // wie WoWs eigener Aufruf 0x77F550 / as WoW's own call at 0x77F550
-        constexpr uintptr_t FrameScriptRegister   = 0x00817F90;  // __cdecl(name, fn)                       (Phase 7)
-        constexpr uintptr_t FrameScriptExecute    = 0x00819210;  // __cdecl(code, source, 0)                (Phase 7)
-        constexpr uintptr_t FrameScriptSignal     = 0x0081B530;  // __cdecl(eventId, fmt, ...)              (Phase 7)
+        constexpr uintptr_t FrameScriptRegister   = 0x00817F90;  // __cdecl(name, fn)                       (ungenutzt / unused)
+        constexpr uintptr_t FrameScriptExecute    = 0x00819210;  // void __cdecl(code, chunkName, taint) - 0 = sicher/secure (Phase 7)
+        constexpr uintptr_t CVarLookup            = 0x00767460;  // CVar* __cdecl(name)  (aus Lua GetCVar 0x510040 / from Lua GetCVar)
+        constexpr uint32_t  CVarStringValue       = 0x28;        // char* Wert / value
+        constexpr uintptr_t ServerVoiceAllowed    = 0x00BCF004;  // int, IsVoiceChatAllowedByServer (0x4FCCB0)
+        constexpr uintptr_t FrameScriptSignal     = 0x0081B530;  // __cdecl(eventId, fmt, ...)              (ungenutzt / unused)
 
         constexpr uintptr_t ClientConnection      = 0x00C79CF4;  // ClientServices::s_currentConnection (NetClient*)
         constexpr uint32_t  NetHandlers           = 0x53C;       // NetClient: handler[opcode]  (0x631FA0)
@@ -83,6 +86,12 @@ namespace wow
     // EN: runs fn(ctx) and catches access violations (MSVC builds only, SEH). false = exception.
     //     fn must not hold locks or create objects with destructors that matter on an exception.
     bool Guarded(void (*fn)(void*), void* ctx);
+
+    // DE: Blizzard-UI (Phase 7), nur Hauptthread. EN: Blizzard UI (phase 7), main thread only.
+    //     GetCVar: false = CVar unbekannt. EN: false = unknown CVar.
+    bool GetCVar(const char* name, char* out, size_t outSize);
+    void LuaExecute(const char* code);
+    void SetServerVoiceAllowed();   // DE: wie SMSG_FEATURE_SYSTEM_STATUS beim Login (still). EN: like at login (silent).
 
     // DE: Ueberall nutzbar (abgesichertes Lesen). EN: usable anywhere (guarded reads).
     bool SafeRead(uintptr_t addr, void* out, size_t len);

@@ -16,7 +16,7 @@
 
 Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtocol.h`) nutzen `voice.dll` und das AzerothCore-Modul gemeinsam.
 
-## Stand Phase 6
+## Stand Phase 7
 
 **Was funktioniert:**
 - **Übertragung:** Mikrofon → Opus → Murmur → andere Clients → Lautsprecher.
@@ -33,10 +33,14 @@ Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`, `src/shared/VoiceP
   - Die Strahlen laufen im Hauptthread mit festem Budget pro Frame und werden etwa alle 100 ms erneuert. Übergänge sind geglättet (~120 ms).
   - Gruppenmitglieder sind nie betroffen.
 - **Senden:** Gesendet wird nur an „nah + Gruppe“ (Mumble-Whisper). Das spart Bandbreite, und ein manipulierter Client kann niemandem Audio aufzwingen.
+- **Blizzard-Voice-Oberfläche** (wenn der Server `Voice.BlizzardUi = 1` hat und `voice.ini [Ui] NativeUi=1`):
+  - **Voice-Optionsmenü:** Es erscheint unter *Interface → Sound & Voice → Voice*. voice.dll gibt es frei wie der Server beim Login, still: kein Event, und WoWs alte Voice-Engine wird nicht gestartet.
+  - **Einstellungen:** Sie kommen aus dem Menü. „Voice-Chat aktivieren“ ist der Hauptschalter, dazu Mikrofon an/aus, Push-to-Talk oder Sprachaktivierung (mit Empfindlichkeit), die Push-to-Talk-Taste (auch mit Modifikatoren oder Maustaste 3–5) und die Lautstärken für Mikrofon und Sprache.
+  - **Sprecher-Symbole:** Am Spielerrahmen und an den Gruppenrahmen blinkt das originale Lautsprecher-Symbol, wenn du oder ein Gruppenmitglied sprichst. Gruppenmitglieder mit Voice bekommen das Voice-Symbol. Technisch erweitert eine Lua-Bridge `UnitIsTalking`/`GetVoiceStatus` und liefert `VOICE_START`, `VOICE_STOP` und `VOICE_STATUS_UPDATE` an alle Frames, die sie registriert haben, also auch an Addons.
 - **Kein Code-Patch:** Spiel-Daten und Pakete werden im WoW-Hauptthread verarbeitet (gesubclasstes WoW-Fenster). Für die Serverpakete wird nur ein Handler in WoWs Handler-Tabelle eingetragen, fremde Pakete gehen an den Original-Handler.
 
 **Bewusst noch nicht enthalten:**
-- **Eigene PTT-Taste:** Die Taste steht in `voice.ini`, die WoW-Tastenbelegung und die Blizzard-Voice-UI folgen in Phase 7.
+- **Noch nicht aus dem WoW-Menü:** Geräteauswahl (weiter über `voice.ini`), Mikrofontest, Absenken der Spielgeräusche beim Sprechen und die Sprecherliste oben links (`VoiceChatTalkers`).
 - **Adressen nur statisch geprüft:** Alle Client-Adressen stehen in `voice/WowApi.h`. Sie sind an der originalen 12340-Exe **statisch geprüft** (Disassembly: Handler-Tabelle `conn+0x53C`, Aufruf `cdecl(param, opcode, time, CDataStore*)`), aber noch **nicht zur Laufzeit**.
 
 **Hier getestet:**
@@ -48,6 +52,7 @@ Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`, `src/shared/VoiceP
   - Verschiedene Channels hören sich nicht.
   - Ungebundene Nutzer werden gekickt.
   - Flüstern über Channel-Grenzen (Gruppe) kommt an.
+- **Lua-Bridge:** Mit Lua 5.1 wie in WoW (`tests/nativeui_test.sh`) werden Overrides, Event-Zustellung (auch nach einem fehlerhaften Handler), „keine Events ohne Änderung“ und das einmalige Eintragen des Menüs geprüft.
 - **Unit-Tests:** Entfernung, Panning, Drehung, hinten/vorne, Occlusion-Formel, Gruppen-Modus (nie leiser), Koordinaten und knackfreie Lautstärke-Rampen. Dazu der Occlusion-Tracker mit einer Test-Wand: voll, frei, teilweise (1/3), Strahlbudget, Glättung und Aufräumen.
 - **Builds:** `voice.dll` wird fehlerfrei als 32-Bit-DLL gebaut, und das AzerothCore-Modul kompiliert ohne Warnungen.
 - **In WoW selbst ist nichts getestet.**
@@ -79,7 +84,7 @@ Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`, `src/shared/VoiceP
 ## Test-Checkliste (bitte `voice.log` und das Worldserver-Log zurückmelden)
 
 - [ ] Startet WoW normal, mit und ohne `voice.dll`?
-- [ ] Steht `voice.dll started (phase 6)` in `voice.log`?
+- [ ] Steht `voice.dll started (phase 7)` in `voice.log`?
 - [ ] Steht nach dem Betreten der Welt `ServerLink: SMSG handler installed` im Log?
 - [ ] **Mit Modul:** Erscheinen im Log nacheinander:
   - [ ] `server config: <host>:<port> as '<Name>'`
@@ -92,6 +97,14 @@ Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`, `src/shared/VoiceP
 - [ ] Steht `UDP active` im Log?
 - [ ] **Fremde:** Hören sich zwei Clients (nicht in einer Gruppe) gegenseitig? Wird es leiser, wenn man weggeht, und ist es ab ca. 40 yd stumm? Kommt die Stimme von der richtigen Seite?
 - [ ] **Gruppe:** Hört man ein Gruppenmitglied auch in 200 yd noch voll und aus der richtigen Richtung? Hört man es auch, wenn es in einer Instanz oder auf einem anderen Kontinent ist?
+- [ ] **Blizzard-Oberfläche:**
+  - [ ] Steht `NativeUi: Blizzard voice options unlocked` im Log, und gibt es unter *Interface → Sound & Voice* den Punkt *Voice*?
+  - [ ] Ist Voice aus, bis „Voice-Chat aktivieren“ angehakt ist (Log: `voice chat is off in the WoW options`)?
+  - [ ] Verbindet es nach dem Anhaken?
+  - [ ] Funktionieren die Push-to-Talk-Taste aus dem Menü (Log: `push-to-talk: WoW binding '…'`), die Sprachaktivierung und die Lautstärkeregler?
+  - [ ] Blinkt das Lautsprecher-Symbol am eigenen Rahmen und am Gruppenrahmen beim Sprechen?
+  - [ ] Funktioniert das auch nach `/reload`, ohne dass *Voice* doppelt im Menü steht?
+  - [ ] Startet WoWs alte Voice-Engine trotzdem? Das sieht man z. B. an einer Meldung „Voice-Chat nicht verfügbar“ oder daran, dass das Mikrofon doppelt belegt ist.
 - [ ] **Occlusion:** Wird ein Fremder hinter einer Hauswand oder einem Hügel leiser und dumpfer, und kommt der Klang beim Hervortreten weich zurück? Bleibt ein Gruppenmitglied hinter der Wand unverändert? Taucht `occlusion: access violation` im Log auf, passt die Adresse von `TraceLine` nicht, dann bitte melden.
 - [ ] Wechselt beim Betreten einer Instanz der Kontext, und hören sich Spieler in verschiedenen Instanzen derselben Dungeon-ID nicht (außer in derselben Gruppe)?
 - [ ] Funktionieren `.voice status`, `.voice mute <Name>`, `.voice unmute <Name>` und `.voice kick <Name>`?

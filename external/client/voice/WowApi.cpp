@@ -60,6 +60,35 @@ namespace wow
         return reinterpret_cast<Fn>(addr::TraceLine)(&start, &end, &hit, &fraction, flags, 0);
     }
 
+    bool GetCVar(const char* name, char* out, size_t outSize)
+    {
+        if (!outSize) return false;
+        out[0] = 0;
+        auto cvar = reinterpret_cast<uintptr_t>(reinterpret_cast<void*(__cdecl*)(const char*)>(addr::CVarLookup)(name));
+        if (!cvar) return false;
+        uintptr_t str = 0;
+        if (!SafeRead(cvar + addr::CVarStringValue, &str, sizeof(str)) || !str) return false;
+        size_t i = 0;
+        for (; i + 1 < outSize; ++i)
+        {
+            char c;
+            if (!SafeRead(str + i, &c, 1) || !c) break;
+            out[i] = c;
+        }
+        out[i] = 0;
+        return true;
+    }
+
+    void LuaExecute(const char* code)
+    {
+        reinterpret_cast<void(__cdecl*)(const char*, const char*, int)>(addr::FrameScriptExecute)(code, "mod-voicechat", 0);
+    }
+
+    void SetServerVoiceAllowed()
+    {
+        *reinterpret_cast<volatile int32_t*>(addr::ServerVoiceAllowed) = 1;
+    }
+
     uint32_t CurrentMapId()
     {
         int32_t id = -1;

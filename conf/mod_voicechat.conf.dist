@@ -165,6 +165,22 @@ Voice.NearbyIntervalMs = 1000
 Voice.GroupAlwaysAudible = 1
 
 ###################################################################################################
+# OBERFLAECHE / USER INTERFACE
+#
+#    Voice.BlizzardUi
+#        DE: 1 = voice.dll nutzt die originale Blizzard-Voice-Oberflaeche: Voice-Optionsmenue (Ein/Aus,
+#            Mikrofon, Push-to-Talk-Taste, Sprachaktivierung, Lautstaerken) und Sprecher-Symbole an Spieler-
+#            und Gruppenrahmen. Voice ist dann erst aktiv, wenn der Spieler es im Menue einschaltet.
+#            Nur Spieler mit voice.dll sehen das Menue. 0 = Einstellungen nur ueber voice.ini.
+#        EN: 1 = voice.dll uses the original Blizzard voice UI: voice options menu (on/off, microphone,
+#            push-to-talk key, voice activation, volumes) and speaker icons on player and party frames.
+#            Voice is then only active once the player enables it in the menu.
+#            Only players with voice.dll see the menu. 0 = settings via voice.ini only.
+#        Default: 1
+
+Voice.BlizzardUi = 1
+
+###################################################################################################
 # RECHTE + SICHERHEIT / PERMISSIONS + SECURITY
 #
 #    Voice.MinSecurity

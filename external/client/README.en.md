@@ -16,7 +16,7 @@
 
 The shared protocol code (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtocol.h`) is used by both `voice.dll` and the AzerothCore module.
 
-## Phase 6 status
+## Phase 7 status
 
 **What works:**
 - **Transmission:** microphone → Opus → Murmur → other clients → speakers.
@@ -33,10 +33,14 @@ The shared protocol code (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtoc
   - The rays run on the main thread with a fixed budget per frame and are refreshed about every 100 ms. Transitions are smoothed (~120 ms).
   - Group members are never affected.
 - **Sending:** audio only goes to "near + group" (Mumble whisper). This saves bandwidth, and a manipulated client cannot force audio on anyone.
+- **Blizzard voice UI** (when the server has `Voice.BlizzardUi = 1` and `voice.ini [Ui] NativeUi=1`):
+  - **Voice options menu:** it appears under *Interface → Sound & Voice → Voice*. voice.dll unlocks it like the server does at login, silently: no event, and WoW's old voice engine is not started.
+  - **Settings:** they come from the menu. "Enable voice chat" is the master switch, plus microphone on/off, push-to-talk or voice activation (with sensitivity), the push-to-talk key (also with modifiers or mouse buttons 3–5) and the volumes for microphone and voice.
+  - **Speaker icons:** the original speaker icon flashes on the player frame and the party frames when you or a group member talks. Group members with voice get the voice icon. Technically, a Lua bridge extends `UnitIsTalking`/`GetVoiceStatus` and delivers `VOICE_START`, `VOICE_STOP` and `VOICE_STATUS_UPDATE` to every frame that registered them, addons included.
 - **No code patch:** game data and packets are processed on the WoW main thread (subclassed WoW window). For the server packets, only a handler is put into WoW's handler table; other packets go to the original handler.
 
 **Deliberately not included yet:**
-- **Own PTT key:** the key is set in `voice.ini`; WoW key bindings and the Blizzard voice UI follow in phase 7.
+- **Not from the WoW menu yet:** device selection (still via `voice.ini`), microphone test, lowering game sounds while talking and the talker list at the top left (`VoiceChatTalkers`).
 - **Addresses only checked statically:** all client addresses are in `voice/WowApi.h`. They were **checked statically** against the original 12340 exe (disassembly: handler table `conn+0x53C`, call `cdecl(param, opcode, time, CDataStore*)`), but **not at runtime** yet.
 
 **Tested here:**
@@ -48,6 +52,7 @@ The shared protocol code (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtoc
   - Different channels do not hear each other.
   - Unbound users are kicked.
   - Whispering across channel borders (group) arrives.
+- **Lua bridge:** with Lua 5.1 as in WoW (`tests/nativeui_test.sh`), the tests check the overrides, event delivery (also after a failing handler), "no events without change" and adding the menu exactly once.
 - **Unit tests:** distance, panning, rotation, behind/front, occlusion formula, group mode (never quieter), coordinates and click-free volume ramps. Plus the occlusion tracker against a test wall: full, free, partial (1/3), ray budget, smoothing and cleanup.
 - **Builds:** `voice.dll` builds cleanly as a 32-bit DLL, and the AzerothCore module compiles without warnings.
 - **Nothing has been tested inside WoW itself.**
@@ -79,7 +84,7 @@ The shared protocol code (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtoc
 ## Test checklist (please report back `voice.log` and the worldserver log)
 
 - [ ] Does WoW start normally, with and without `voice.dll`?
-- [ ] Is `voice.dll started (phase 6)` in `voice.log`?
+- [ ] Is `voice.dll started (phase 7)` in `voice.log`?
 - [ ] After entering the world, is `ServerLink: SMSG handler installed` in the log?
 - [ ] **With the module:** do these lines appear in the log, in order?
   - [ ] `server config: <host>:<port> as '<name>'`
@@ -92,6 +97,14 @@ The shared protocol code (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtoc
 - [ ] Is `UDP active` in the log?
 - [ ] **Strangers:** do two clients (not grouped) hear each other? Does the voice get quieter when walking away, and is it silent from about 40 yd? Does the voice come from the right side?
 - [ ] **Group:** is a group member still fully audible at 200 yd and from the right direction? Can you also hear them when they are in an instance or on another continent?
+- [ ] **Blizzard UI:**
+  - [ ] Does `NativeUi: Blizzard voice options unlocked` appear in the log, and is there a *Voice* entry under *Interface → Sound & Voice*?
+  - [ ] Is voice off until "Enable voice chat" is ticked (log: `voice chat is off in the WoW options`)?
+  - [ ] Does it connect after ticking it?
+  - [ ] Do the push-to-talk key from the menu (log: `push-to-talk: WoW binding '…'`), voice activation and the volume sliders work?
+  - [ ] Does the speaker icon flash on your own frame and on the party frame while talking?
+  - [ ] Does this still work after `/reload`, without *Voice* showing up twice in the menu?
+  - [ ] Does WoW's old voice engine start anyway? You would notice e.g. a "voice chat unavailable" message or the microphone being taken twice.
 - [ ] **Occlusion:** does a stranger behind a house wall or a hill become quieter and duller, and does the sound come back softly when they step out? Does a group member behind the wall stay unchanged? If `occlusion: access violation` shows up in the log, the `TraceLine` address does not match, so please report it.
 - [ ] Does the context change when entering an instance, and do players in different instances of the same dungeon ID not hear each other (unless in the same group)?
 - [ ] Do `.voice status`, `.voice mute <name>`, `.voice unmute <name>` and `.voice kick <name>` work?

@@ -17,7 +17,7 @@ jobs:
       - name: Install Murmur
         run: |
           sudo apt-get update
-          sudo apt-get install -y mumble-server libboost-dev libssl-dev
+          sudo apt-get install -y mumble-server libboost-dev libssl-dev lua5.1
           sudo systemctl stop mumble-server || true
 
       - name: Build voicecore + voicecli
@@ -37,6 +37,9 @@ jobs:
       - name: Unit tests (spatial math, mixer)
         working-directory: build
         run: ctest --output-on-failure
+
+      - name: Lua bridge test (Blizzard UI, Lua 5.1 like WoW)
+        run: external/client/tests/nativeui_test.sh
 
       - name: End-to-end test (UDP + TCP tunnel)
         working-directory: build

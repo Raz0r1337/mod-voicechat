@@ -67,6 +67,7 @@ namespace voice
         _tx.SetVadThreshold(_cfg.vadThreshold);
         _tx.SetInputGain(_cfg.inputGain);
         _mixer.SetMasterVolume(_cfg.outputVolume);
+        _pttKeys = { _cfg.pushToTalkKey };
 
         // DE: Verkabelung Audio <-> Netz. EN: wiring audio <-> network.
         _tx.onPacket = [this](const uint8_t* p, size_t n, bool term) {
@@ -99,6 +100,7 @@ namespace voice
         // DE: MVCP-Pakete im Hauptthread senden/empfangen. EN: send/receive MVCP packets on the main thread.
         _game.onTick = [this](const GameSnapshot& s) {
             _server.MainTick(s.inWorld);
+            _ui.MainTick(s.inWorld);
             if (s.inWorld && !_occOff) TraceOcclusion(s);
         };
 
@@ -163,6 +165,14 @@ namespace voice
                 }
             }
 
+            _ui.SetActive(_nativeUi && _inWorld);
+            ApplyAudioSettings();
+            if (now >= _nextUiState)
+            {
+                _nextUiState = now + 100;
+                UpdateUiState();
+            }
+
             if (!_occOff && now >= _nextOccUpdate)
             {
                 _nextOccUpdate = now + 100;
@@ -173,7 +183,7 @@ namespace voice
             {
                 HWND w = wow::MainWindow();
                 bool foreground = _game.Get().tickMs != 0 && w && GetForegroundWindow() == w;
-                _tx.SetPushToTalk(foreground && (GetAsyncKeyState(_cfg.pushToTalkKey) & 0x8000) != 0);
+                _tx.SetPushToTalk(foreground && PushToTalkDown());
             }
             else
                 _tx.SetPushToTalk(false);
@@ -192,6 +202,8 @@ namespace voice
         _helloTries = 0;
         _helloBackoffMs = 2000;
         _nextHello = now + 1000;   // DE: kurz nach dem Betreten. EN: shortly after entering.
+        _nativeUi = false;
+        _userOff = false;
         if (!_inWorld) _link = Link::Off;
         else _link = _cfg.serverMode == "standalone" ? Link::Standalone : Link::Hello;
     }
@@ -248,6 +260,7 @@ namespace voice
                     _spatial.maxDistance = maxD;
                 }
                 _link = Link::Configured;
+                _nativeUi = c.nativeUi && _cfg.nativeUi;
                 _bound = false;
                 _bindTries = 0;
                 _nextBind = now;
@@ -286,6 +299,7 @@ namespace voice
                 Log("voice disabled by the server: " + d.reason);
                 Disconnect("disabled by the server");
                 _link = Link::Disabled;
+                _nativeUi = false;
                 // DE: "unavailable" (Murmur weg) -> in 30 s erneut, "disabled" (Modul aus) -> in 5 min;
                 //     Rechte/Kick -> erst nach neuem Betreten der Welt.
                 // EN: "unavailable" (Murmur gone) -> retry in 30 s, "disabled" (module off) -> in 5 min;
@@ -300,6 +314,30 @@ namespace voice
 
     void VoiceApp::StepServer(unsigned long long now)
     {
+        if (_nativeUi)
+        {
+            // DE: Blizzard-UI: "Voice-Chat aktivieren" im WoW-Menue ist der Hauptschalter.
+            // EN: Blizzard UI: "Enable voice chat" in the WoW menu is the master switch.
+            WowVoiceSettings ws = _ui.Settings();
+            if (!ws.valid) return;   // DE: CVars noch nicht gelesen / CVars not read yet
+            if (!ws.enabled)
+            {
+                if (_active) Disconnect("voice chat switched off in the WoW options");
+                if (!_userOff) Log("voice chat is off in the WoW options (Interface -> Sound & Voice -> Voice)");
+                _userOff = true;
+                return;
+            }
+            if (_userOff)
+            {
+                // DE: Wieder an -> frische CONFIG (die Nonce ist evtl. abgelaufen). EN: on again -> fresh CONFIG (nonce may have expired).
+                _userOff = false;
+                _link = Link::Hello;
+                _helloTries = 0;
+                _nextHello = now;
+                return;
+            }
+        }
+
         if (_active && _lost)
         {
             // DE: Neue Verbindung braucht eine neue Nonce -> wieder HELLO (mit Backoff).
@@ -407,6 +445,85 @@ namespace voice
         _context = ctx;
         _client.SetPluginContext(ctx, s.name);
         Log("context " + ctx);
+    }
+
+    // ------------------------------------------------------------------------------------------
+    //  Blizzard-UI (Phase 7)
+    // ------------------------------------------------------------------------------------------
+    void VoiceApp::ApplyAudioSettings()
+    {
+        WowVoiceSettings ws = _nativeUi ? _ui.Settings() : WowVoiceSettings();
+        if (!ws.valid)
+        {
+            // DE: voice.ini. EN: voice.ini.
+            _tx.SetMode(_cfg.mode == "vad" ? TransmitMode::VoiceActivation
+                      : _cfg.mode == "continuous" ? TransmitMode::Continuous
+                      : TransmitMode::PushToTalk);
+            _tx.SetMuted(false);
+            _tx.SetVadThreshold(_cfg.vadThreshold);
+            _tx.SetInputGain(_cfg.inputGain);
+            _mixer.SetMasterVolume(_cfg.outputVolume);
+            if (!_pttBinding.empty()) { _pttBinding.clear(); _pttKeys = { _cfg.pushToTalkKey }; }
+            return;
+        }
+        _tx.SetMode(ws.voiceActivation ? TransmitMode::VoiceActivation : TransmitMode::PushToTalk);
+        _tx.SetMuted(!ws.microphone);
+        // DE: Empfindlichkeit 1 = reagiert auf leise Stimmen. EN: sensitivity 1 = reacts to quiet voices.
+        _tx.SetVadThreshold(0.005f + (1.0f - ws.vadSensitivity) * 0.05f);
+        _tx.SetInputGain(ws.inputGain);
+        _mixer.SetMasterVolume(ws.outputVolume);
+        std::string binding = ws.pushToTalk.empty() ? std::string("-") : ws.pushToTalk;
+        if (binding != _pttBinding)
+        {
+            _pttBinding = binding;
+            _pttKeys = ws.pushToTalk.empty() ? std::vector<int>() : ParseWowBinding(ws.pushToTalk);
+            if (_pttKeys.empty())
+            {
+                _pttKeys = { _cfg.pushToTalkKey };
+                Log("push-to-talk: WoW binding '" + ws.pushToTalk + "' not usable -> voice.ini key");
+            }
+            else
+                Log("push-to-talk: WoW binding '" + ws.pushToTalk + "'");
+        }
+    }
+
+    bool VoiceApp::PushToTalkDown() const
+    {
+        if (_pttKeys.empty()) return false;
+        for (int vk : _pttKeys)
+            if (!(GetAsyncKeyState(vk) & 0x8000)) return false;
+        return true;
+    }
+
+    void VoiceApp::UpdateUiState()
+    {
+        // DE: Wer hat Voice, wer spricht (nur ich + Gruppe; Fremde haben keinen Rahmen).
+        // EN: who has voice, who is talking (only me + group; strangers have no frame).
+        std::set<std::string> talking, voiceNames;
+        if (_nativeUi && _active && _bound && _client.State() == ClientState::Connected && !_charName.empty())
+        {
+            voiceNames.insert(_charName);
+            if (_tx.IsTalking()) talking.insert(_charName);
+            std::map<uint32_t, std::string> names;
+            for (const auto& u : _client.Users())
+                names[u.session] = u.name.substr(0, u.name.find('@'));
+            std::set<uint32_t> group;
+            {
+                std::lock_guard<std::mutex> g(_posMutex);
+                group = _group;
+            }
+            for (uint32_t s : group)
+            {
+                auto it = names.find(s);
+                if (it != names.end()) voiceNames.insert(it->second);
+            }
+            for (uint32_t s : _mixer.Talking())
+            {
+                auto it = names.find(s);
+                if (group.count(s) && it != names.end()) talking.insert(it->second);
+            }
+        }
+        _ui.SetState(talking, voiceNames);
     }
 
     // ------------------------------------------------------------------------------------------

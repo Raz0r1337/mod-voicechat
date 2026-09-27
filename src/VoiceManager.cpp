@@ -67,6 +67,7 @@ namespace VoiceChat
         s.serverCulling     = sConfigMgr->GetOption<bool>("Voice.ServerCulling", true);
         s.muteChatMuted     = sConfigMgr->GetOption<bool>("Voice.MuteChatMuted", true);
         s.groupAlwaysAudible = sConfigMgr->GetOption<bool>("Voice.GroupAlwaysAudible", true);
+        s.blizzardUi        = sConfigMgr->GetOption<bool>("Voice.BlizzardUi", true);
 
         s.bot.host          = sConfigMgr->GetOption<std::string>("Voice.Bot.Host", "127.0.0.1");
         s.bot.port          = uint16(sConfigMgr->GetOption<uint32>("Voice.Bot.Port", 64738));
@@ -290,6 +291,7 @@ namespace VoiceChat
         c.context = vp.context;
         c.minDistance = _cfg.minDistance;
         c.maxDistance = _cfg.maxDistance;
+        c.nativeUi = _cfg.blizzardUi;
         SendToClient(player, VoiceProto::Encode(c));
         LOG_DEBUG("module", "mod-voicechat: CONFIG -> {}", vp.username);
     }

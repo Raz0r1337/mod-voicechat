@@ -7,7 +7,8 @@ add_library(voice SHARED
     AudioIO.cpp
     WowApi.cpp
     GameThread.cpp
-    ServerLink.cpp)
+    ServerLink.cpp
+    NativeUi.cpp)
 
 set_target_properties(voice PROPERTIES PREFIX "" OUTPUT_NAME "voice")
 target_include_directories(voice PRIVATE ${miniaudio_SOURCE_DIR})

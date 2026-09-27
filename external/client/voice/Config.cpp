@@ -81,6 +81,8 @@ namespace voice
         occlusionHeadHeight = GetF(path, "Occlusion", "HeadHeight", occlusionHeadHeight);
         occlusionRaysPerTick = GetPrivateProfileIntA("Occlusion", "RaysPerTick", occlusionRaysPerTick, path.c_str());
 
+        nativeUi = GetPrivateProfileIntA("Ui", "NativeUi", nativeUi, path.c_str()) != 0;
+
         log = GetPrivateProfileIntA("Debug", "Log", log, path.c_str()) != 0;
         return true;
     }
@@ -105,6 +107,61 @@ namespace voice
         };
         for (auto& e : names) if (n == e.name) return e.vk;
         return int(std::strtol(n.c_str(), nullptr, 10));
+    }
+
+    std::vector<int> ParseWowBinding(const std::string& binding)
+    {
+        // DE: Teile an '-' trennen; "CTRL--" = Strg + Minus. EN: split at '-'; "CTRL--" = ctrl + minus.
+        std::vector<std::string> parts;
+        std::string cur;
+        for (size_t i = 0; i < binding.size(); ++i)
+        {
+            char c = binding[i];
+            if (c == '-' && !cur.empty()) { parts.push_back(cur); cur.clear(); }
+            else cur += c;
+        }
+        if (!cur.empty()) parts.push_back(cur);
+
+        struct { const char* name; int vk; } names[] = {
+            { "LSHIFT", VK_LSHIFT }, { "RSHIFT", VK_RSHIFT }, { "SHIFT", VK_SHIFT },
+            { "LCTRL", VK_LCONTROL }, { "RCTRL", VK_RCONTROL }, { "CTRL", VK_CONTROL },
+            { "LALT", VK_LMENU }, { "RALT", VK_RMENU }, { "ALT", VK_MENU },
+            { "SPACE", VK_SPACE }, { "TAB", VK_TAB }, { "CAPSLOCK", VK_CAPITAL }, { "ENTER", VK_RETURN },
+            { "BACKSPACE", VK_BACK }, { "ESCAPE", VK_ESCAPE }, { "INSERT", VK_INSERT }, { "DELETE", VK_DELETE },
+            { "HOME", VK_HOME }, { "END", VK_END }, { "PAGEUP", VK_PRIOR }, { "PAGEDOWN", VK_NEXT },
+            { "UP", VK_UP }, { "DOWN", VK_DOWN }, { "LEFT", VK_LEFT }, { "RIGHT", VK_RIGHT },
+            { "NUMLOCK", VK_NUMLOCK }, { "NUMPADDIVIDE", VK_DIVIDE }, { "NUMPADMULTIPLY", VK_MULTIPLY },
+            { "NUMPADMINUS", VK_SUBTRACT }, { "NUMPADPLUS", VK_ADD }, { "NUMPADDECIMAL", VK_DECIMAL },
+            { "MIDDLEBUTTON", VK_MBUTTON }, { "BUTTON3", VK_MBUTTON }, { "BUTTON4", VK_XBUTTON1 }, { "BUTTON5", VK_XBUTTON2 },
+        };
+        std::vector<int> vks;
+        for (const auto& raw : parts)
+        {
+            std::string n;
+            for (char c : raw) n += char(std::toupper(static_cast<unsigned char>(c)));
+            int vk = 0;
+            for (auto& e : names) if (n == e.name) { vk = e.vk; break; }
+            if (!vk && n.size() >= 2 && n[0] == 'F' && std::isdigit(static_cast<unsigned char>(n[1])))
+            {
+                int f = std::atoi(n.c_str() + 1);
+                if (f >= 1 && f <= 24) vk = VK_F1 + f - 1;
+            }
+            if (!vk && n.rfind("NUMPAD", 0) == 0 && n.size() == 7 && std::isdigit(static_cast<unsigned char>(n[6])))
+                vk = VK_NUMPAD0 + (n[6] - '0');
+            if (!vk && n.size() == 1)
+            {
+                if ((n[0] >= 'A' && n[0] <= 'Z') || (n[0] >= '0' && n[0] <= '9')) vk = n[0];
+                else
+                {
+                    // DE: Sonderzeichen ueber das aktuelle Tastaturlayout. EN: special characters via the current keyboard layout.
+                    SHORT r = VkKeyScanA(raw[0]);
+                    if (r != -1) vk = r & 0xFF;
+                }
+            }
+            if (!vk) return {};   // DE: unbekannt -> keine Taste / unknown -> no key
+            vks.push_back(vk);
+        }
+        return vks;
     }
 
     void SetLogEnabled(bool on) { g_logEnabled = on; }

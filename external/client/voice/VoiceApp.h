@@ -7,6 +7,7 @@
 #include "AudioIO.h"
 #include "Config.h"
 #include "GameThread.h"
+#include "NativeUi.h"
 #include "ServerLink.h"
 
 #include "voicecore/AudioMixer.h"
@@ -44,12 +45,21 @@ namespace voice
         void Disconnect(const char* why);
         void UpdateContext(const GameSnapshot& s);
         void UpdateOcclusionCandidates(unsigned long long now);
+        void ApplyAudioSettings();
+        void UpdateUiState();
+        bool PushToTalkDown() const;
         void TraceOcclusion(const GameSnapshot& s);   // Hauptthread / main thread
         voicecore::SpeakerGain GainFor(uint32_t session);
 
         Config _cfg;
         GameThread _game;
         ServerLink _server;
+        NativeUi _ui;
+        bool _nativeUi = false;          // DE: Server erlaubt + voice.ini will / server allows + voice.ini wants
+        bool _userOff = false;           // DE: im WoW-Menue ausgeschaltet / switched off in the WoW menu
+        std::string _pttBinding;
+        std::vector<int> _pttKeys;
+        unsigned long long _nextUiState = 0;
         AudioIO _audio;
         voicecore::MumbleClient _client;
         voicecore::AudioMixer _mixer;

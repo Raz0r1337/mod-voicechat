@@ -6,6 +6,7 @@
 
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace voice
 {
@@ -47,6 +48,9 @@ namespace voice
         float occlusionHeadHeight = 1.5f;
         int occlusionRaysPerTick = 9;
 
+        // [Ui]
+        bool nativeUi = true;            // Blizzard-Voice-UI nutzen, wenn der Server es erlaubt / use the Blizzard voice UI if the server allows
+
         // [Debug]
         bool log = true;
 
@@ -55,6 +59,9 @@ namespace voice
     };
 
     int ParseKey(const std::string& name);
+    // DE: WoW-Tastenbelegung ("LCTRL-F", "BUTTON4", "`") -> virtuelle Tasten (alle muessen gedrueckt sein).
+    // EN: WoW key binding ("LCTRL-F", "BUTTON4", "`") -> virtual keys (all must be down).
+    std::vector<int> ParseWowBinding(const std::string& binding);
     void Log(const std::string& msg);
     void SetLogEnabled(bool on);
 }

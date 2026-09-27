@@ -6,7 +6,7 @@
 
 Native 3D proximity voice for **World of Warcraft 3.3.5a (build 12340)** and **AzerothCore**, using **Murmur** (Mumble server) as the voice backend.
 
-> **Status: phases 3–6 built, awaiting the first test in WoW.** Positional voice with AzerothCore integration (permissions, map/instance, group) and damping through walls (occlusion), still without the Blizzard UI.
+> **Status: phases 3–7 built, awaiting the first test in WoW.** Positional voice with AzerothCore integration (permissions, map/instance, group), damping through walls (occlusion) and the original Blizzard voice UI.
 > The full report is in [docs/en/REPORT.md](docs/en/REPORT.md).
 
 ## Goal
@@ -19,7 +19,7 @@ Native 3D proximity voice for **World of Warcraft 3.3.5a (build 12340)** and **A
 - **Positional audio:** volume by distance, direction via stereo/3D, damping through walls and terrain (occlusion: quieter and duller, soft transition at corners)
 - **Separate worlds:** continents and every instance (e.g. Naxxramas #42 and #43) are isolated from each other
 - **Party/raid:** group members are always heard at full volume, even on other maps or in instances. Their position only sets the direction of the voice. Strangers are only heard within range, getting quieter with distance.
-- **Integration:** feels like the original WoW voice (Blizzard voice UI, push-to-talk, options)
+- **Integration:** feels like the original WoW voice. Voice options menu under *Interface → Sound & Voice → Voice* (on/off, microphone, push-to-talk key, voice activation, volumes) and speaker icons on player and party frames.
 
 ## Architecture at a glance
 
@@ -52,7 +52,7 @@ mod-voicechat/          ← clone into AzerothCore as modules/mod-voicechat
 2. **AzerothCore module:**
    1. Clone it into `azerothcore-wotlk/modules/mod-voicechat`, re-run CMake and build the worldserver. No core patch is needed.
    2. Copy `mod_voicechat.conf.dist` to `mod_voicechat.conf` and set at least these values: `Voice.Enable = 1`, `Voice.Bot.Password` (the SuperUser password), `Voice.PublicHost` (the Murmur address as players reach it) and `Voice.ServerPassword` (if Murmur has one).
-3. **Client:** patch `Wow.exe` with the loader and put `voice.dll` into the WoW folder, see [`external/client/README.en.md`](external/client/README.en.md) (step-by-step test included). With the module, `voice.ini` needs no server data, because address, name and channel come from the worldserver.
+3. **Client:** patch `Wow.exe` with the loader and put `voice.dll` into the WoW folder, see [`external/client/README.en.md`](external/client/README.en.md) (step-by-step test included). With the module, `voice.ini` needs no server data, because address, name and channel come from the worldserver. Each player switches voice on in the game: *Interface → Sound & Voice → Voice → Enable voice chat* (can be turned off with `Voice.BlizzardUi = 0`, then `voice.ini` applies).
 
 ### How the integration works
 
@@ -82,7 +82,7 @@ Players muted in chat (`.mute`) are also muted in voice by default (`Voice.MuteC
 | 4 | Positional audio (X/Y/Z, orientation, distance, direction) | 🧪 built, awaiting test in WoW |
 | 5 | AzerothCore integration (login/logout, map/instance, permissions, group) | 🧪 built, awaiting test in WoW |
 | 6 | Occlusion (raycast, attenuation, low-pass) | 🧪 built, awaiting test in WoW |
-| 7 | Native Blizzard voice UI | – |
+| 7 | Native Blizzard voice UI | 🧪 built, awaiting test in WoW |
 
 ## References
 

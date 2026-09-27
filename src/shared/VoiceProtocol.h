@@ -49,6 +49,8 @@ namespace VoiceProto
         std::string host, password, certPin, nonce, username, botName, context;
         uint32_t port = 64738;
         float minDistance = 3.0f, maxDistance = 40.0f;
+        // DE: Blizzard-Voice-UI nutzen (Optionsmenue, Sprecher-Symbole, CVars). EN: use the Blizzard voice UI.
+        bool nativeUi = false;
     };
 
     struct Context { std::string context; uint32_t seq = 0; };
@@ -100,6 +102,7 @@ namespace VoiceProto
         w.Str(8, m.context);
         w.Float(9, m.minDistance);
         w.Float(10, m.maxDistance);
+        w.Bool(11, m.nativeUi);
         return Wrap(Msg::Config, w);
     }
 
@@ -164,6 +167,7 @@ namespace VoiceProto
                 case 8: m.context = f.Str(); break;
                 case 9: m.minDistance = f.Float(); break;
                 case 10: m.maxDistance = f.Float(); break;
+                case 11: m.nativeUi = f.Bool(); break;
                 default: break;
             }
         }

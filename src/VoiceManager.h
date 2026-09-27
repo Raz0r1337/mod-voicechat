@@ -59,6 +59,7 @@ namespace VoiceChat
         bool serverCulling = true;
         bool muteChatMuted = true;
         bool groupAlwaysAudible = true;
+        bool blizzardUi = true;
         std::vector<std::string> allowedExternalUsers;
     };
 
