@@ -167,6 +167,7 @@ namespace voice
 
             _ui.SetActive(_nativeUi && _inWorld);
             ApplyAudioSettings();
+            UpdateDevices(now);
             if (now >= _nextUiState)
             {
                 _nextUiState = now + 100;
@@ -487,6 +488,38 @@ namespace voice
         }
     }
 
+    void VoiceApp::DesiredDevices(std::string& in, std::string& out)
+    {
+        in = _cfg.inputDevice;
+        out = _cfg.outputDevice;
+        if (!_nativeUi) return;
+        WowVoiceSettings ws = _ui.Settings();
+        if (!ws.valid) return;
+        // DE: Index 0 = Standard (bzw. voice.ini), 1..n = Liste im Voice-Menue. EN: index 0 = default (or voice.ini), 1..n = menu list.
+        if (ws.inputDevice > 0 && ws.inputDevice <= int(_capNames.size())) in = _capNames[size_t(ws.inputDevice - 1)];
+        if (ws.outputDevice > 0 && ws.outputDevice <= int(_playNames.size())) out = _playNames[size_t(ws.outputDevice - 1)];
+    }
+
+    void VoiceApp::UpdateDevices(unsigned long long now)
+    {
+        if (_nativeUi && now >= _nextDevEnum)
+        {
+            // DE: Liste fuers Menue auffrischen (Headset ein-/ausgesteckt). EN: refresh the menu list (headset plugged in/out).
+            _nextDevEnum = now + 30000;
+            if (AudioIO::ListDevices(_capNames, _playNames))
+                _ui.SetDevices(_capNames, _playNames);
+        }
+        if (!_audio.Running()) return;
+        std::string in, out;
+        DesiredDevices(in, out);
+        if (in == _curIn && out == _curOut) return;
+        Log("audio devices changed in the voice menu -> reopening");
+        _audio.Stop();
+        _curIn = in;
+        _curOut = out;
+        if (!_audio.Start(_curIn, _curOut)) Log("audio start failed");
+    }
+
     bool VoiceApp::PushToTalkDown() const
     {
         if (_pttKeys.empty()) return false;
@@ -618,8 +651,11 @@ namespace voice
 
     void VoiceApp::Connect(const ClientConfig& cc)
     {
-        if (!_audio.Running() && !_audio.Start(_cfg.inputDevice, _cfg.outputDevice))
-            Log("audio start failed");
+        if (!_audio.Running())
+        {
+            DesiredDevices(_curIn, _curOut);
+            if (!_audio.Start(_curIn, _curOut)) Log("audio start failed");
+        }
         _lost = false;
         _context.clear();
         _targetValid = false;

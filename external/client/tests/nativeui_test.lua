@@ -106,5 +106,19 @@ run('if MVC then MVC.Sync({}, {}) end')
 check(table.concat(seen, " "):find("player:VOICE_STOP:player") ~= nil, "reset stops the player icon")
 check(UnitIsTalking("Me") == nil and GetVoiceStatus("player") == nil, "reset clears talking and voice")
 
+-- 8) Geraeteliste im Voice-Menue / device list in the voice menu
+local refreshed = 0
+AudioOptionsVoicePanelInputDeviceDropDown = { RefreshValue = function(self) refreshed = refreshed + 1 end }
+DEFAULT = "Standard"
+run('MVC.SetDevices({"Mic A","Headset \\"B\\""},{"Speakers"})')
+check(Sound_ChatSystem_GetNumInputDrivers() == 3 and Sound_ChatSystem_GetNumOutputDrivers() == 2, "device counts incl. default")
+check(Sound_ChatSystem_GetInputDriverNameByIndex(0) == "Standard", "index 0 = default")
+check(Sound_ChatSystem_GetInputDriverNameByIndex(2) == 'Headset "B"', "escaped device name")
+check(Sound_ChatSystem_GetOutputDriverNameByIndex(1) == "Speakers", "output name")
+check(VoiceEnumerateCaptureDevices(1) == "Mic A" and VoiceSelectCaptureDevice("x") == nil, "native select is harmless")
+check(refreshed == 1, "dropdown refreshed on change")
+run('MVC.SetDevices({"Mic A","Headset \\"B\\""},{"Speakers"})')
+check(refreshed == 1, "no refresh without change")
+
 if fails == 0 then print("nativeui_test: all checks passed") end
 os.exit(fails == 0 and 0 or 1)

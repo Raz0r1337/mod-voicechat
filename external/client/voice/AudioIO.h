@@ -8,6 +8,7 @@
 #include <functional>
 #include <memory>
 #include <string>
+#include <vector>
 
 namespace voice
 {
@@ -25,6 +26,9 @@ namespace voice
         bool Start(const std::string& inputDevice, const std::string& outputDevice);
         void Stop();
         bool Running() const;
+
+        // DE: Geraetenamen (UTF-8) fuer das Voice-Menue. EN: device names (UTF-8) for the voice menu.
+        static bool ListDevices(std::vector<std::string>& capture, std::vector<std::string>& playback);
 
     private:
         struct Impl;

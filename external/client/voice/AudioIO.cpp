@@ -54,6 +54,9 @@ namespace voice
             if (ma_context_get_devices(ctx, &play, &nPlay, &cap, &nCap) != MA_SUCCESS) return nullptr;
             ma_device_info* list = type == ma_device_type_capture ? cap : play;
             ma_uint32 n = type == ma_device_type_capture ? nCap : nPlay;
+            // DE: Erst exakter Name (Voice-Menue), dann Teilstring (voice.ini). EN: exact name first (voice menu), then substring (voice.ini).
+            for (ma_uint32 i = 0; i < n; ++i)
+                if (name == list[i].name) { out = list[i].id; return &out; }
             for (ma_uint32 i = 0; i < n; ++i)
                 if (std::strstr(list[i].name, name.c_str())) { out = list[i].id; return &out; }
             Log("audio device not found: " + name);
@@ -122,6 +125,24 @@ namespace voice
         if (d.playOk) ma_device_uninit(&d.playback);
         if (d.ctxOk) ma_context_uninit(&d.ctx);
         _impl.reset();
+    }
+
+    bool AudioIO::ListDevices(std::vector<std::string>& capture, std::vector<std::string>& playback)
+    {
+        capture.clear();
+        playback.clear();
+        ma_context ctx;
+        if (ma_context_init(nullptr, 0, nullptr, &ctx) != MA_SUCCESS) return false;
+        ma_device_info *play = nullptr, *cap = nullptr;
+        ma_uint32 nPlay = 0, nCap = 0;
+        bool ok = ma_context_get_devices(&ctx, &play, &nPlay, &cap, &nCap) == MA_SUCCESS;
+        if (ok)
+        {
+            for (ma_uint32 i = 0; i < nCap; ++i) capture.emplace_back(cap[i].name);
+            for (ma_uint32 i = 0; i < nPlay; ++i) playback.emplace_back(play[i].name);
+        }
+        ma_context_uninit(&ctx);
+        return ok;
     }
 
     bool AudioIO::Running() const { return _impl && (_impl->capOk || _impl->playOk); }

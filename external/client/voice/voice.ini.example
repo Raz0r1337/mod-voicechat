@@ -71,10 +71,12 @@ RaysPerTick=9
 [Ui]
 ; DE: 1 = Blizzard-Voice-Oberflaeche nutzen, wenn der Server es erlaubt (Voice-Optionsmenue, Sprecher-Symbole).
 ;     Dann gelten die Einstellungen aus dem WoW-Menue (Ein/Aus, Mikrofon, Push-to-Talk-Taste, Sprachaktivierung,
-;     Lautstaerken) statt der Werte oben in [Audio]. 0 = nur voice.ini.
+;     Lautstaerken, Geraete) statt der Werte oben in [Audio]; Geraet "Standard" im Menue = InputDevice/OutputDevice oben.
+;     0 = nur voice.ini.
 ; EN: 1 = use the Blizzard voice UI if the server allows it (voice options menu, speaker icons).
 ;     The WoW menu settings (on/off, microphone, push-to-talk key, voice activation, volumes) then replace
-;     the [Audio] values above. 0 = voice.ini only.
+;     the [Audio] values above (incl. devices; "Default" in the menu = InputDevice/OutputDevice above).
+;     0 = voice.ini only.
 NativeUi=1
 
 [Debug]

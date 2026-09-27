@@ -48,6 +48,8 @@ namespace voice
         void ApplyAudioSettings();
         void UpdateUiState();
         bool PushToTalkDown() const;
+        void DesiredDevices(std::string& in, std::string& out);
+        void UpdateDevices(unsigned long long now);
         void TraceOcclusion(const GameSnapshot& s);   // Hauptthread / main thread
         voicecore::SpeakerGain GainFor(uint32_t session);
 
@@ -60,6 +62,9 @@ namespace voice
         std::string _pttBinding;
         std::vector<int> _pttKeys;
         unsigned long long _nextUiState = 0;
+        std::vector<std::string> _capNames, _playNames;   // Liste im Voice-Menue / list in the voice menu
+        unsigned long long _nextDevEnum = 0;
+        std::string _curIn, _curOut;                       // geoeffnete Geraete / opened devices
         AudioIO _audio;
         voicecore::MumbleClient _client;
         voicecore::AudioMixer _mixer;

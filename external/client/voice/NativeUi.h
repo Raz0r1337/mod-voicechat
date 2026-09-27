@@ -23,6 +23,7 @@
 #include <mutex>
 #include <set>
 #include <string>
+#include <vector>
 
 namespace voice
 {
@@ -36,6 +37,8 @@ namespace voice
         float inputGain = 1.0f;         // OutboundChatVolume (0.25 .. 2.5)
         float outputVolume = 1.0f;      // InboundChatVolume (0 .. 1)
         float vadSensitivity = 0.5f;    // VoiceActivationSensitivity (0 .. 1)
+        int inputDevice = 0;            // Sound_VoiceChatInputDriverIndex (0 = Standard / default)
+        int outputDevice = 0;           // Sound_VoiceChatOutputDriverIndex
     };
 
     class NativeUi
@@ -44,6 +47,8 @@ namespace voice
         // DE: Worker. EN: worker.
         void SetActive(bool active);
         void SetState(const std::set<std::string>& talking, const std::set<std::string>& voice);
+        // DE: Geraeteliste fuer das Voice-Menue (Index 1..n, 0 = Standard). EN: device list for the voice menu.
+        void SetDevices(const std::vector<std::string>& capture, const std::vector<std::string>& playback);
         WowVoiceSettings Settings();
 
         // DE: Hauptthread. EN: main thread.
@@ -53,6 +58,7 @@ namespace voice
         std::mutex _mutex;
         bool _active = false;
         std::set<std::string> _talking, _voice;
+        std::vector<std::string> _capture, _playback;
         bool _dirty = true;
         WowVoiceSettings _settings;
 

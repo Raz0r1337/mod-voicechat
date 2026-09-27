@@ -284,7 +284,8 @@ The runtime test is still pending.
   - It extends `UnitIsTalking` and `GetVoiceStatus`.
   - `VOICE_START`, `VOICE_STOP` and `VOICE_STATUS_UPDATE` go to all frames via `EnumerateFrames` + `IsEventRegistered`, each in `pcall` and with the legacy globals `this`/`event`/`arg1`.
 - **Crash protection and tests:** all calls are under the SEH guard. The Lua bridge is tested with Lua 5.1 and mocked WoW functions.
-- **Open:** device selection, microphone test (loopback of the old engine), lowering game sounds and the talker list `VoiceChatTalkers` (needs the session API).
+- **Device selection (phase 8a):** the Lua bridge replaces `Sound_ChatSystem_GetNum/…DriverNameByIndex` and `VoiceEnumerate/Select*Device` with voice.dll's WASAPI device list (index 0 = default). voice.dll reads `Sound_VoiceChatInput/OutputDriverIndex` and reopens the devices on change.
+- **Open:** microphone test (loopback of the old engine), lowering game sounds and the talker list `VoiceChatTalkers` (needs the session API).
 
 ## 4. Codec
 

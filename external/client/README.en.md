@@ -35,12 +35,12 @@ The shared protocol code (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtoc
 - **Sending:** audio only goes to "near + group" (Mumble whisper). This saves bandwidth, and a manipulated client cannot force audio on anyone.
 - **Blizzard voice UI** (when the server has `Voice.BlizzardUi = 1` and `voice.ini [Ui] NativeUi=1`):
   - **Voice options menu:** it appears under *Interface → Sound & Voice → Voice*. voice.dll unlocks it like the server does at login, silently: no event, and WoW's old voice engine is not started.
-  - **Settings:** they come from the menu. "Enable voice chat" is the master switch, plus microphone on/off, push-to-talk or voice activation (with sensitivity), the push-to-talk key (also with modifiers or mouse buttons 3–5) and the volumes for microphone and voice.
+  - **Settings:** they come from the menu. "Enable voice chat" is the master switch, plus microphone on/off, push-to-talk or voice activation (with sensitivity), the push-to-talk key (also with modifiers or mouse buttons 3–5), the volumes for microphone and voice, and the **input and output device**. The device lists in the menu are the devices voice.dll actually uses (WASAPI). "Default" means the Windows default device or `InputDevice`/`OutputDevice` from `voice.ini`. A change takes effect immediately, without reconnecting.
   - **Speaker icons:** the original speaker icon flashes on the player frame and the party frames when you or a group member talks. Group members with voice get the voice icon. Technically, a Lua bridge extends `UnitIsTalking`/`GetVoiceStatus` and delivers `VOICE_START`, `VOICE_STOP` and `VOICE_STATUS_UPDATE` to every frame that registered them, addons included.
 - **No code patch:** game data and packets are processed on the WoW main thread (subclassed WoW window). For the server packets, only a handler is put into WoW's handler table; other packets go to the original handler.
 
 **Deliberately not included yet:**
-- **Not from the WoW menu yet:** device selection (still via `voice.ini`), microphone test, lowering game sounds while talking and the talker list at the top left (`VoiceChatTalkers`).
+- **Not from the WoW menu yet:** microphone test, lowering game sounds while talking and the talker list at the top left (`VoiceChatTalkers`).
 - **Addresses only checked statically:** all client addresses are in `voice/WowApi.h`. They were **checked statically** against the original 12340 exe (disassembly: handler table `conn+0x53C`, call `cdecl(param, opcode, time, CDataStore*)`), but **not at runtime** yet.
 
 **Tested here:**
@@ -102,6 +102,7 @@ The shared protocol code (`src/shared/MumbleProtocol.h`, `src/shared/VoiceProtoc
   - [ ] Is voice off until "Enable voice chat" is ticked (log: `voice chat is off in the WoW options`)?
   - [ ] Does it connect after ticking it?
   - [ ] Do the push-to-talk key from the menu (log: `push-to-talk: WoW binding '…'`), voice activation and the volume sliders work?
+  - [ ] Do the device menus show your microphones and speakers, and does voice.dll switch on selection (log: `audio devices changed in the voice menu`)?
   - [ ] Does the speaker icon flash on your own frame and on the party frame while talking?
   - [ ] Does this still work after `/reload`, without *Voice* showing up twice in the menu?
   - [ ] Does WoW's old voice engine start anyway? You would notice e.g. a "voice chat unavailable" message or the microphone being taken twice.

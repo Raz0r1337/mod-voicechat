@@ -48,6 +48,28 @@ if not MVC then
       f = EnumerateFrames(f)
     end
   end
+  -- DE: Voice-Menue zeigt die Geraete von voice.dll (Index 0 = Standard). EN: voice menu shows voice.dll's devices.
+  MVC.inDev, MVC.outDev = {}, {}
+  local function devName(list, i) i = tonumber(i) or 0 if i == 0 then return DEFAULT or "Default" end return list[i] end
+  Sound_ChatSystem_GetNumInputDrivers = function() return #MVC.inDev + 1 end
+  Sound_ChatSystem_GetInputDriverNameByIndex = function(i) return devName(MVC.inDev, i) end
+  Sound_ChatSystem_GetNumOutputDrivers = function() return #MVC.outDev + 1 end
+  Sound_ChatSystem_GetOutputDriverNameByIndex = function(i) return devName(MVC.outDev, i) end
+  VoiceEnumerateCaptureDevices = function(i) return devName(MVC.inDev, i) end
+  VoiceEnumerateOutputDevices = function(i) return devName(MVC.outDev, i) end
+  VoiceSelectCaptureDevice = function() end
+  VoiceSelectOutputDevice = function() end
+  function MVC.SetDevices(inList, outList)
+    local changed = #inList ~= #MVC.inDev or #outList ~= #MVC.outDev
+    for i, n in ipairs(inList) do if MVC.inDev[i] ~= n then changed = true end end
+    for i, n in ipairs(outList) do if MVC.outDev[i] ~= n then changed = true end end
+    MVC.inDev, MVC.outDev = inList, outList
+    if changed then
+      for _, dd in ipairs({ AudioOptionsVoicePanelInputDeviceDropDown, AudioOptionsVoicePanelOutputDeviceDropDown }) do
+        if dd and dd.RefreshValue then pcall(dd.RefreshValue, dd) end
+      end
+    end
+  end
   function MVC.Sync(talking, voice)
     local changed = false
     for n in pairs(voice) do if not MVC.voice[n] then changed = true end end
@@ -94,6 +116,13 @@ end
             return o + "\"";
         }
 
+        std::string LuaList(const std::vector<std::string>& names)
+        {
+            std::string o = "{";
+            for (const auto& n : names) o += LuaQuote(n) + ",";
+            return o + "}";
+        }
+
         std::string LuaSet(const std::set<std::string>& names)
         {
             std::string o = "{";
@@ -103,7 +132,7 @@ end
 
         struct CVarCtx
         {
-            char enable[8], mic[8], mode[8], ptt[64], outVol[16], inVol[16], sens[16];
+            char enable[8], mic[8], mode[8], ptt[64], outVol[16], inVol[16], sens[16], inDev[8], outDev[8];
             bool ok;
         };
 
@@ -117,6 +146,8 @@ end
             wow::GetCVar("OutboundChatVolume", c->outVol, sizeof(c->outVol));
             wow::GetCVar("InboundChatVolume", c->inVol, sizeof(c->inVol));
             wow::GetCVar("VoiceActivationSensitivity", c->sens, sizeof(c->sens));
+            wow::GetCVar("Sound_VoiceChatInputDriverIndex", c->inDev, sizeof(c->inDev));
+            wow::GetCVar("Sound_VoiceChatOutputDriverIndex", c->outDev, sizeof(c->outDev));
         }
 
         void RunLua(void* p) { wow::LuaExecute(static_cast<const char*>(p)); }
@@ -146,6 +177,15 @@ end
         _dirty = true;
     }
 
+    void NativeUi::SetDevices(const std::vector<std::string>& capture, const std::vector<std::string>& playback)
+    {
+        std::lock_guard<std::mutex> g(_mutex);
+        if (capture == _capture && playback == _playback) return;
+        _capture = capture;
+        _playback = playback;
+        _dirty = true;
+    }
+
     WowVoiceSettings NativeUi::Settings()
     {
         std::lock_guard<std::mutex> g(_mutex);
@@ -167,11 +207,12 @@ end
 
         bool active, dirty;
         std::set<std::string> talking, voice;
+        std::vector<std::string> capture, playback;
         {
             std::lock_guard<std::mutex> g(_mutex);
             active = _active;
             dirty = active && _dirty;
-            if (active) { talking = _talking; voice = _voice; _dirty = false; }
+            if (active) { talking = _talking; voice = _voice; capture = _capture; playback = _playback; _dirty = false; }
         }
         if (!active)
         {
@@ -209,6 +250,8 @@ end
                 s.inputGain = ToFloat(c.outVol, 1.0f, 0.25f, 2.5f);
                 s.outputVolume = ToFloat(c.inVol, 1.0f, 0.0f, 1.0f);
                 s.vadSensitivity = ToFloat(c.sens, 0.5f, 0.0f, 1.0f);
+                s.inputDevice = std::atoi(c.inDev);
+                s.outputDevice = std::atoi(c.outDev);
                 std::lock_guard<std::mutex> g(_mutex);
                 _settings = s;
             }
@@ -230,7 +273,8 @@ end
         if (dirty || now >= _nextInstall)
         {
             _nextInstall = now + 5000;
-            std::string code = std::string(kInstall) + "\nMVC.Sync(" + LuaSet(talking) + "," + LuaSet(voice) + ")\n";
+            std::string code = std::string(kInstall) + "\nMVC.SetDevices(" + LuaList(capture) + "," + LuaList(playback) +
+                               ")\nMVC.Sync(" + LuaSet(talking) + "," + LuaSet(voice) + ")\n";
             if (!wow::Guarded(&RunLua, const_cast<char*>(code.c_str())))
             {
                 _broken = true;

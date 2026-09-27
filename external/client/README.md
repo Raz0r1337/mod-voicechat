@@ -35,12 +35,12 @@ Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`, `src/shared/VoiceP
 - **Senden:** Gesendet wird nur an „nah + Gruppe“ (Mumble-Whisper). Das spart Bandbreite, und ein manipulierter Client kann niemandem Audio aufzwingen.
 - **Blizzard-Voice-Oberfläche** (wenn der Server `Voice.BlizzardUi = 1` hat und `voice.ini [Ui] NativeUi=1`):
   - **Voice-Optionsmenü:** Es erscheint unter *Interface → Sound & Voice → Voice*. voice.dll gibt es frei wie der Server beim Login, still: kein Event, und WoWs alte Voice-Engine wird nicht gestartet.
-  - **Einstellungen:** Sie kommen aus dem Menü. „Voice-Chat aktivieren“ ist der Hauptschalter, dazu Mikrofon an/aus, Push-to-Talk oder Sprachaktivierung (mit Empfindlichkeit), die Push-to-Talk-Taste (auch mit Modifikatoren oder Maustaste 3–5) und die Lautstärken für Mikrofon und Sprache.
+  - **Einstellungen:** Sie kommen aus dem Menü. „Voice-Chat aktivieren“ ist der Hauptschalter, dazu Mikrofon an/aus, Push-to-Talk oder Sprachaktivierung (mit Empfindlichkeit), die Push-to-Talk-Taste (auch mit Modifikatoren oder Maustaste 3–5), die Lautstärken für Mikrofon und Sprache sowie **Ein- und Ausgabegerät**. Die Gerätelisten im Menü sind die Geräte, die voice.dll tatsächlich nutzt (WASAPI). „Standard“ bedeutet das Windows-Standardgerät oder `InputDevice`/`OutputDevice` aus `voice.ini`. Ein Wechsel greift sofort, ohne Neuverbindung.
   - **Sprecher-Symbole:** Am Spielerrahmen und an den Gruppenrahmen blinkt das originale Lautsprecher-Symbol, wenn du oder ein Gruppenmitglied sprichst. Gruppenmitglieder mit Voice bekommen das Voice-Symbol. Technisch erweitert eine Lua-Bridge `UnitIsTalking`/`GetVoiceStatus` und liefert `VOICE_START`, `VOICE_STOP` und `VOICE_STATUS_UPDATE` an alle Frames, die sie registriert haben, also auch an Addons.
 - **Kein Code-Patch:** Spiel-Daten und Pakete werden im WoW-Hauptthread verarbeitet (gesubclasstes WoW-Fenster). Für die Serverpakete wird nur ein Handler in WoWs Handler-Tabelle eingetragen, fremde Pakete gehen an den Original-Handler.
 
 **Bewusst noch nicht enthalten:**
-- **Noch nicht aus dem WoW-Menü:** Geräteauswahl (weiter über `voice.ini`), Mikrofontest, Absenken der Spielgeräusche beim Sprechen und die Sprecherliste oben links (`VoiceChatTalkers`).
+- **Noch nicht aus dem WoW-Menü:** Mikrofontest, Absenken der Spielgeräusche beim Sprechen und die Sprecherliste oben links (`VoiceChatTalkers`).
 - **Adressen nur statisch geprüft:** Alle Client-Adressen stehen in `voice/WowApi.h`. Sie sind an der originalen 12340-Exe **statisch geprüft** (Disassembly: Handler-Tabelle `conn+0x53C`, Aufruf `cdecl(param, opcode, time, CDataStore*)`), aber noch **nicht zur Laufzeit**.
 
 **Hier getestet:**
@@ -102,6 +102,7 @@ Den gemeinsamen Protokollcode (`src/shared/MumbleProtocol.h`, `src/shared/VoiceP
   - [ ] Ist Voice aus, bis „Voice-Chat aktivieren“ angehakt ist (Log: `voice chat is off in the WoW options`)?
   - [ ] Verbindet es nach dem Anhaken?
   - [ ] Funktionieren die Push-to-Talk-Taste aus dem Menü (Log: `push-to-talk: WoW binding '…'`), die Sprachaktivierung und die Lautstärkeregler?
+  - [ ] Zeigen die Geräte-Menüs deine Mikrofone und Lautsprecher, und wechselt voice.dll bei Auswahl (Log: `audio devices changed in the voice menu`)?
   - [ ] Blinkt das Lautsprecher-Symbol am eigenen Rahmen und am Gruppenrahmen beim Sprechen?
   - [ ] Funktioniert das auch nach `/reload`, ohne dass *Voice* doppelt im Menü steht?
   - [ ] Startet WoWs alte Voice-Engine trotzdem? Das sieht man z. B. an einer Meldung „Voice-Chat nicht verfügbar“ oder daran, dass das Mikrofon doppelt belegt ist.
